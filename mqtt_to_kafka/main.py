@@ -15,7 +15,7 @@ def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")
     parser.add_argument("mqtt_host", help="The MQTT host address.")
     # ai! make the mqtt_topic a flag, -t, that is repeatable
-    parser.add_argument("mqtt_topic", help="The MQTT topic to subscribe to.")
+    parser.add_argument("-t", "--topic", dest="mqtt_topic", action="append", help="The MQTT topic to subscribe to.")
 
     args = parser.parse_args()
 

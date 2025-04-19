@@ -11,67 +11,13 @@ summaries = {
     "current": Summary('power_current', 'Power draw in amps', labels),
     "voltage": Summary('power_voltage', 'Power supply voltage', labels),
     "apparent_power": Summary('power_apparent', 'Apparent power', labels),
-    "power_factor": Summary('power_factor', 'Power factor', labels),
-    "reactive_power": Summary('power_reactive', 'Reactive power', labels),
-    "energy": Summary('power_energy', 'Energy', labels),
+    "energy": Summary('power_energy', 'Energy consumption', labels)
 }
 
 gauges = {
-    "uptime_sensor": Gauge("uptime", "uptime in seconds", labels),
-    "relay": Gauge("power_relay_status", "Status of the plug relay", labels),
-    "occupancy": Gauge("presence_occupancy", "Status of the occupancy sensor", labels),
-    "light_sensor": Gauge("light_level", "Light level in Lux", labels)
+    "occupancy": Gauge('occupancy', 'Occupancy status'),
+    "light_sensor": Gauge('light_level', 'Light level')
 }
-
-
-def on_message(client, userdata, msg):
-    payload = msg.payload.decode("utf-8")
-    # office/plug/computers/sensor/power/state
-    #print(msg.topic, payload)
-    # office/plug/test/switch/switch/state
-
-    printed = False
-
-    if groups := re.match(r"devices/home/([\w\-]+)/plug/(\w+)/switch/switch/state", msg.topic):
-        groups = groups.groups()
-        if payload.lower() == "on":
-            gauges['relay'].labels("home", groups[0], groups[1]).set(1)
-            printed = True
-        else:
-            gauges['relay'].labels("home", groups[0], groups[1]).set(0)
-            printed = True
-
-    if groups := re.match(r"devices/home/([\w\-]+)/plug/(\w+)/sensor/(\w+)/state", msg.topic):
-        groups = groups.groups()
-
-        if groups[2] in summaries.keys():
-            summaries[groups[2]].labels("home", groups[0], groups[1]).observe(float(payload))
-            printed = True
-
-        elif groups[2] in gauges:
-            gauges[groups[2]].labels("home", groups[0], groups[1]).set(float(payload))
-            printed = True
-
-    # devices/home/bedroom/presence/bed/binary_sensor/occupancy/state
-    if groups := re.match(r"devices/home/([\w\-]+)/presence/(\w+)/binary_sensor/occupancy/state", msg.topic):
-        groups = groups.groups()
-        if payload.lower() == "on":
-            gauges['occupancy'].labels("home", groups[0], groups[1]).set(1)
-            printed = True
-        else:
-            gauges['occupancy'].labels("home", groups[0], groups[1]).set(0)
-            printed = True
-
-    if groups := re.match(r"devices/home/([\w\-]+)/presence/(\w+)/sensor/light_sensor/state", msg.topic):
-        groups = groups.groups()
-
-        gauges['light_sensor'].labels("home", groups[0], groups[1]).set(float(payload))
-        printed = True
-
-    if not printed:
-        print(msg.topic + " " + payload)
-
-
 
 
 def generate_on_connect(topics):
@@ -80,6 +26,7 @@ def generate_on_connect(topics):
             client.subscribe(topic)
 
     return on_connect
+
 
 def main(args):
     start_http_server(9101)
@@ -90,7 +37,6 @@ def main(args):
     args = parser.parse_args()
     print(args)
 
-    #mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc.on_connect = generate_on_connect(args.topics)
     mqttc.on_message = on_message
@@ -100,6 +46,53 @@ def main(args):
     mqttc.loop_forever()
 
     return 0
+
+
+def on_message(client, userdata, msg):
+    topic = msg.topic
+    payload = msg.payload.decode()
+
+    if topic.startswith("devices/home"):
+        parts = topic.split("/")
+        zone = parts[2]
+        area = parts[3]
+        thing = parts[4]
+
+        if thing == "plug" and parts[5] == "sensor":
+            sensor_type = parts[6]
+            try:
+                value = float(payload)
+                if sensor_type in summaries:
+                    summaries[sensor_type].labels(zone=zone, area=area, thing=thing).observe(value)
+            except ValueError:
+                print(f"Invalid value for {sensor_type}: {payload}")
+
+        elif thing == "plug" and parts[5] == "binary_sensor":
+            if payload.lower() == "on":
+                value = 1
+            else:
+                value = 0
+            # Assuming binary sensors represent on/off state
+            # You might need to adjust this based on your specific sensors
+            # summaries["plug_state"].labels(zone=zone, area=area, thing=thing).observe(value)
+
+        elif thing == "presence" and parts[5] == "binary_sensor":
+            if payload.lower() == "on":
+                value = 1
+            else:
+                value = 0
+            gauges["occupancy"].labels(zone=zone, area=area).set(value)
+
+        elif thing == "presence" and parts[5] == "sensor":
+            try:
+                value = float(payload)
+                gauges["light_sensor"].labels(zone=zone, area=area).set(value)
+            except ValueError:
+                print(f"Invalid light sensor value: {payload}")
+
+    else:
+        print(f"Unknown topic: {topic} with payload: {payload}")
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

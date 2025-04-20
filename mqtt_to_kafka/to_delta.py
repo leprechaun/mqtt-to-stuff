@@ -8,9 +8,6 @@ from typing import Dict, Tuple
 from collections.abc import Callable
 
 
-# ai! explain this file to me
-
-
 class MonitoredDevice:
     data = {}
     keys = {}

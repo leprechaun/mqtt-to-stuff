@@ -1,0 +1,1 @@
+python to_delta.py localhost -t "devices/#" -d "/path/to/deltalake" -i 120

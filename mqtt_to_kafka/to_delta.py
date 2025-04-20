@@ -3,6 +3,9 @@ import sys
 import paho.mqtt.client as mqtt
 import deltalake
 import polars
+import os
+import threading
+import time
 
 from typing import Dict, Tuple
 from collections.abc import Callable
@@ -17,6 +20,22 @@ class MonitoredDevice:
 
     def __init__(self, location):
         self.location = location
+        self.schema = self._create_schema()
+
+    def _create_schema(self):
+        schema_fields = []
+        for (sensor_type, key), type_conv in self.keys.items():
+            polars_type = polars.Float64 if type_conv[0] == float else polars.Boolean
+            schema_fields.append((f"{sensor_type}_{key}", polars_type))
+        
+        schema_fields.extend([
+            ("zone", polars.Utf8),
+            ("area", polars.Utf8),
+            ("thing", polars.Utf8),
+            ("timestamp", polars.Datetime)
+        ])
+        
+        return schema_fields
 
     def set(self, key, value):
         if key in self.keys:
@@ -24,19 +43,35 @@ class MonitoredDevice:
 
             if self.data.get(key) != value:
                 self.data[key] = value
-
+                self.changed = True
 
     def get_change_record(self):
-        if self.changed == True:
+        if self.changed:
             self.changed = False
-            return self.data
-        else:
-            return None
+            record = self.data.copy()
+            record['zone'] = self.location[0]
+            record['area'] = self.location[1]
+            record['thing'] = self.location[2]
+            record['timestamp'] = polars.datetime_now()
+            self.records.append(record)
+            return record
+        return None
 
-        as_array = [self.data.get(k) for k in self.keys]
+    def batch_write_records(self, base_path):
+        if not self.records:
+            return
 
-        if sum(1 for x in as_array if x is None) == 0:
-            self.records.append(as_array)
+        df = polars.DataFrame(self.records, schema=self.schema)
+        
+        table_path = os.path.join(base_path, f"{self.location[0]}_{self.location[1]}_{self.location[2]}")
+        
+        deltalake.write_deltatable(
+            table_path, 
+            df, 
+            mode='append'
+        )
+        
+        self.records.clear()
 
 
 class MonitoringPlug(MonitoredDevice):
@@ -72,9 +107,18 @@ class DeviceRegister:
 
         return None
 
+    def batch_write_all_records(self, base_path):
+        for device in self.devices.values():
+            device.batch_write_records(base_path)
+
 
 register = DeviceRegister()
 register.add_device_type("plug", MonitoringPlug)
+
+def periodic_batch_writer(register, base_path, interval=60):
+    while True:
+        time.sleep(interval)
+        register.batch_write_all_records(base_path)
 
 def on_message(client, userdata, msg):
     payload = msg.payload.decode("utf-8")
@@ -87,7 +131,6 @@ def on_message(client, userdata, msg):
             print(e)
             print("exception: " + msg.topic)
             return
-
 
         key = (zone, area, thing)
         device = register.get_or_create(
@@ -103,7 +146,6 @@ def on_message(client, userdata, msg):
             if change:
                 print(key, { k[1]: v for (k, v) in change.items()})
 
-
     else:
         print(msg.topic)
 
@@ -116,14 +158,23 @@ def generate_on_connect(topics):
     return on_connect
 
 def main(args):
-    parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")
+    parser = argparse.ArgumentParser(description="Copy MQTT events to DeltaLake.")
     parser.add_argument("mqtt_host", help="The MQTT host address.")
     parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
+    parser.add_argument("-d", "--delta-path", dest="delta_path", default="/tmp/deltalake", help="Base path for DeltaLake tables")
+    parser.add_argument("-i", "--interval", type=int, default=60, help="Batch write interval in seconds")
 
     args = parser.parse_args()
     print(args)
 
-    #mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    # Start periodic batch writer thread
+    batch_thread = threading.Thread(
+        target=periodic_batch_writer, 
+        args=(register, args.delta_path, args.interval), 
+        daemon=True
+    )
+    batch_thread.start()
+
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc.on_connect = generate_on_connect(args.topics)
     mqttc.on_message = on_message

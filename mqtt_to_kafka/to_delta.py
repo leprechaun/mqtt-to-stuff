@@ -91,7 +91,11 @@ class DeviceRegister:
 
         return None
 
-    # ai! add a method to append data to a device by key or location.
+    def append_data(self, kind, key, data_key, value):
+        device = self.get_or_create(kind, key)
+        if device:
+            device.set(data_key, value)
+
 
 register = DeviceRegister()
 register.add_device_type("plug", MonitoringPlug)

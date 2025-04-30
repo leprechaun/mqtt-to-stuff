@@ -20,22 +20,6 @@ class MonitoredDevice:
 
     def __init__(self, location):
         self.location = location
-        self.schema = self._create_schema()
-
-    def _create_schema(self):
-        schema_fields = []
-        for (sensor_type, key), type_conv in self.keys.items():
-            polars_type = polars.Float64 if type_conv[0] == float else polars.Boolean
-            schema_fields.append((f"{sensor_type}_{key}", polars_type))
-        
-        schema_fields.extend([
-            ("zone", polars.Utf8),
-            ("area", polars.Utf8),
-            ("thing", polars.Utf8),
-            ("timestamp", polars.Datetime)
-        ])
-        
-        return schema_fields
 
     def set(self, key, value):
         if key in self.keys:
@@ -107,18 +91,11 @@ class DeviceRegister:
 
         return None
 
-    def batch_write_all_records(self, base_path):
-        for device in self.devices.values():
-            device.batch_write_records(base_path)
-
+    # ai! add a method to append data to a device by key or location.
 
 register = DeviceRegister()
 register.add_device_type("plug", MonitoringPlug)
 
-def periodic_batch_writer(register, base_path, interval=60):
-    while True:
-        time.sleep(interval)
-        register.batch_write_all_records(base_path)
 
 def on_message(client, userdata, msg):
     payload = msg.payload.decode("utf-8")

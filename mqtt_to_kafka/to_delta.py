@@ -101,6 +101,13 @@ register = DeviceRegister()
 register.add_device_type("plug", MonitoringPlug)
 
 
+def periodic_batch_writer(register, base_path, interval):
+    while True:
+        time.sleep(interval)
+        for device in register.devices.values():
+            device.batch_write_records(base_path)
+
+
 def on_message(client, userdata, msg):
     payload = msg.payload.decode("utf-8")
 

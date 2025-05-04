@@ -1,0 +1,10 @@
+.aider.*
+deltalake
+Dockerfile
+.env
+explore.py
+.git
+.gitignore
+.pytest_cache
+tests
+*.pyc

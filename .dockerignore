@@ -8,3 +8,4 @@ explore.py
 .pytest_cache
 tests
 *.pyc
+helmchart/

@@ -267,10 +267,10 @@ def periodic_batch_writer(register, base_path, interval):
 
 def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to DeltaLake.")
-    parser.add_argument("mqtt_host", help="The MQTT host address.")
-    parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
-    parser.add_argument("-d", "--delta-path", dest="delta_path", default="/tmp/deltalake", help="Base path for DeltaLake tables")
-    parser.add_argument("-i", "--interval", type=int, default=60, help="Batch write interval in seconds")
+    parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
+    parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.", default=os.environ.get('MQTT_TOPIC'))
+    parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
+    parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=os.environ.get('INTERVAL', 60))
 
     args = parser.parse_args()
 
@@ -286,7 +286,7 @@ def main(args):
     mqttc.on_connect = generate_on_connect(args.topics)
     mqttc.on_message = on_message
 
-    mqttc.connect(args.mqtt_host, 1883, 60)
+    mqttc.connect(args.host, 1883, 60)
 
     mqttc.loop_forever()
 

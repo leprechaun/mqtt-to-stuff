@@ -8,6 +8,7 @@ import threading
 import time
 from collections import defaultdict
 import datetime
+import signal
 
 from typing import Dict, Tuple
 from collections.abc import Callable
@@ -198,33 +199,8 @@ class DeviceRegister:
         return records
 
 
-register = DeviceRegister()
-register.add_device_type("plug", MonitoringPlug)
-register.add_device_type("presence", PresenceDetector)
-
-register.add_series(Series("iot_device_uptime"))
-register.add_series(Series("electricity"))
-register.add_series(Series("presence"))
-register.add_series(Series("habitat"))
 
 
-def on_message(client, userdata, msg):
-    payload = msg.payload.decode("utf-8")
-
-    # format: devices/{zone}/{area}/{type}/{thing}/...
-    if msg.topic.startswith("devices/"):
-        try:
-            _, zone, area, kind, thing, *rest = msg.topic.split("/")
-            key = (("zone", zone), ("area", area), ("thing", thing))
-            register.append_data(kind, key, tuple(rest), payload)
-
-        except ValueError as e:
-            print(e)
-            print("exception: " + msg.topic)
-            return
-
-    else:
-        print(msg.topic)
 
 
 def generate_on_connect(topics):
@@ -234,36 +210,42 @@ def generate_on_connect(topics):
 
     return on_connect
 
+def write(register, base_path):
+    print("going to write", base_path)
+    for series_name in register.series:
+        series = register.series[series_name]
+        df = pl.DataFrame(series.to_list())
+
+        if df.shape[0] > 0:
+            print(df)
+
+            if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
+                options = {
+                    "endpoint_url": S3_ENDPOINT
+                }
+            else:
+                options = {}
+
+            delta_path = base_path + series_name
+            df.write_delta(
+                delta_path,
+                mode="append",
+                delta_write_options={
+                    "writer_properties": deltalake.WriterProperties(compression="zstd"),
+                },
+                storage_options=options
+            )
+
+            series.clear()
+
 def periodic_batch_writer(register, base_path, interval):
     while True:
         time.sleep(interval)
-        for series_name in register.series:
-            series = register.series[series_name]
-            df = pl.DataFrame(series.to_list())
+        write(register, base_path)
 
-            if df.shape[0] > 0:
-                print(df)
 
-                if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
-                    options = {
-                        "endpoint_url": S3_ENDPOINT
-                    }
-                else:
-                    options = {
 
-                    }
-
-                delta_path = base_path + series_name
-                df.write_delta(
-                    delta_path,
-                    mode="append",
-                    delta_write_options={
-                        "writer_properties": deltalake.WriterProperties(compression="zstd"),
-                    },
-                    storage_options=options
-                )
-
-                series.clear()
+    return sigterm_handler
 
 def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to DeltaLake.")
@@ -273,6 +255,28 @@ def main(args):
     parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=os.environ.get('INTERVAL', 60))
 
     args = parser.parse_args()
+
+    register = DeviceRegister()
+    register.add_device_type("plug", MonitoringPlug)
+    register.add_device_type("presence", PresenceDetector)
+
+    register.add_series(Series("iot_device_uptime"))
+    register.add_series(Series("electricity"))
+    register.add_series(Series("presence"))
+    register.add_series(Series("habitat"))
+
+    def on_message(client, userdata, msg):
+        try:
+            payload = msg.payload.decode("utf-8")
+            _, zone, area, kind, thing, *rest = msg.topic.split("/")
+            key = (("zone", zone), ("area", area), ("thing", thing))
+            register.append_data(kind, key, tuple(rest), payload)
+
+        except ValueError as e:
+            print(e)
+            print("exception: " + msg.topic)
+            return
+
 
     # Start periodic batch writer thread
     batch_thread = threading.Thread(
@@ -285,6 +289,14 @@ def main(args):
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc.on_connect = generate_on_connect(args.topics)
     mqttc.on_message = on_message
+
+
+    def sigterm_handler(SIGNAL, STACK_FRAME):
+        write(register, args.delta_path)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGINT, sigterm_handler)
 
     mqttc.connect(args.host, 1883, 60)
 

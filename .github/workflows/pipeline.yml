@@ -21,7 +21,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - run: |
-          IMAGE="${REGISTRY}/leprechaun/mqtt-to-stuff:latest"
+          REPO="leprechaun/mqtt-to-stuff"
+          IMAGE="${REGISTRY}/${REPO}"
 
-          docker build -t $IMAGE .
-          docker push $IMAGE
+          docker build -t "${IMAGE}:latest" .
+          echo docker tag "${IMAGE}:latest" "${IMAGE}:0.1.${{ github.run_number }}"
+          docker tag "${IMAGE}:latest" "${IMAGE}:0.1.${{ github.run_number }}"
+          docker push "${IMAGE}:0.1.${{ github.run_number }}"

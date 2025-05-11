@@ -60,14 +60,6 @@ def periodic_batch_writer(register, base_path, interval):
         time.sleep(interval)
         write(register, base_path)
 
-labels = ['zone','area','thing']
-Summary('electricity_power', 'Power consumption in watts', labels
-Summary('electricity_current', 'Power draw in amps', labels)
-Summary('electricity_voltage', 'Voltage', labels)
-Summary('electricity_apparent_power', 'Apparent power', labels)
-Summary('electricity_power_factor', 'Power factor', labels)
-Summary('electricity_reactive_power', 'Reactive power', labels)
-
 
 def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to DeltaLake.")

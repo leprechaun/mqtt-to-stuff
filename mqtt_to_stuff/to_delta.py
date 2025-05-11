@@ -48,14 +48,26 @@ def write(register, base_path):
 
             series.clear()
 
+            dt = deltalake.DeltaTable(delta_path,storage_options=options)
+
+            if len(dt.file_uris()) >= 24:
+                dt.optimize.compact()
+                dt.create_checkpoint()
+
+
 def periodic_batch_writer(register, base_path, interval):
     while True:
         time.sleep(interval)
         write(register, base_path)
 
+labels = ['zone','area','thing']
+Summary('electricity_power', 'Power consumption in watts', labels
+Summary('electricity_current', 'Power draw in amps', labels)
+Summary('electricity_voltage', 'Voltage', labels)
+Summary('electricity_apparent_power', 'Apparent power', labels)
+Summary('electricity_power_factor', 'Power factor', labels)
+Summary('electricity_reactive_power', 'Reactive power', labels)
 
-
-    return sigterm_handler
 
 def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to DeltaLake.")
@@ -70,10 +82,21 @@ def main(args):
     register.add_device_type("plug", MonitoringPlug)
     register.add_device_type("presence", PresenceDetector)
 
-    register.add_series(Series("iot_device_uptime"))
-    register.add_series(Series("electricity"))
-    register.add_series(Series("presence"))
-    register.add_series(Series("habitat"))
+
+    uptime = Series("iot_device_uptime")
+    habitat = Series("habitat")
+    presence = Series("presence")
+    electricity = Series("electricity")
+
+    series = [
+        uptime,
+        electricity,
+        presence,
+        habitat
+    ]
+
+    for s in series:
+        register.add_series(s)
 
     def on_message(client, userdata, msg):
         try:

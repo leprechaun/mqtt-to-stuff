@@ -110,7 +110,6 @@ class MonitoredDevice:
 
                 record = self.series[series_name]
                 series_columns = [x[1][1] for x in self.sensors.values() if x[1][0] == series_name]
-                #print(self.device_key, record)
 
                 record_keys = set(list(record.keys()))
                 column_keys = set(series_columns)
@@ -182,4 +181,3 @@ class PresenceDetector(MonitoredDevice):
             ("iot_device_uptime", "uptime")
         ),
     }
-

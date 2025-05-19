@@ -22,6 +22,19 @@ def generate_on_connect(topics):
 
 def write(register, base_path):
     print("going to write", base_path)
+
+    write_options = {
+        "writer_properties": deltalake.WriterProperties(compression="zstd"),
+        "partition_by":['date']
+    }
+
+    if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
+        options = {
+            "endpoint_url": S3_ENDPOINT
+        }
+    else:
+        options = {}
+
     for series_name in register.series:
         series = register.series[series_name]
         df = pl.DataFrame(series.to_list())
@@ -29,20 +42,13 @@ def write(register, base_path):
         if df.shape[0] > 0:
             print(df)
 
-            if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
-                options = {
-                    "endpoint_url": S3_ENDPOINT
-                }
-            else:
-                options = {}
-
             delta_path = base_path + series_name
-            df.write_delta(
+            df.with_columns(
+                pl.col("timestamp").dt.date().alias("date")
+            ).write_delta(
                 delta_path,
                 mode="append",
-                delta_write_options={
-                    "writer_properties": deltalake.WriterProperties(compression="zstd"),
-                },
+                delta_write_options=write_options,
                 storage_options=options
             )
 

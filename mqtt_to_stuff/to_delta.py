@@ -11,7 +11,8 @@ import signal
 from typing import Dict, Tuple
 from collections.abc import Callable
 
-from devices import MonitoringPlug, PresenceDetector, DeviceRegister, Series
+from devices import MonitoringPlug, PresenceDetector
+from register import DeviceRegister, Series
 
 def generate_on_connect(topics):
     def on_connect(client, userdata, flags, reason_code, properties):

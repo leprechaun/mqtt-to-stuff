@@ -7,7 +7,7 @@ RUN cd /app/
 ADD pyproject.toml /app/
 ADD poetry.lock /app/
 
-RUN poetry install --no-root
+RUN poetry install --without dev --no-root
 
 ENTRYPOINT ["poetry", "run", "python"]
 

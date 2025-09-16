@@ -1,7 +1,6 @@
 import argparse
 import sys
 import paho.mqtt.client as mqtt
-from prometheus_client import start_http_server
 import deltalake
 import polars as pl
 import datetime

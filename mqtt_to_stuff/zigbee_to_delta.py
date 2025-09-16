@@ -39,7 +39,7 @@ class ZigbeeDeviceRegister:
             if len(self.timeseries[name]) > 0:
                 df = pl.DataFrame(self.timeseries[name]).with_columns(date=pl.col('timestamp').dt.date())
                 df.write_delta(
-                    base_path + "/" + name,
+                    base_path + name,
                     mode="append",
                     delta_write_options=write_options,
                     storage_options=options

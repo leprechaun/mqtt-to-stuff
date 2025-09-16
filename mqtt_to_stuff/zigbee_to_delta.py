@@ -222,7 +222,7 @@ def main(args):
     mqttc.on_connect = generate_on_connect(args.topics)
     mqttc.on_message = on_message
 
-    mqttc.connect(args.mqtt_host, 1883, 60)
+    mqttc.connect(args.host, 1883, 60)
 
     mqttc.loop_forever()
 

@@ -199,7 +199,6 @@ def generate_on_connect(topics):
 def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")
     parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
-    parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
     parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=os.environ.get('INTERVAL', 60))
 
@@ -214,10 +213,11 @@ def main(args):
     batch_thread.start()
 
 
+    topics = ["zigbee2mqtt/#"]
 
     #mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    mqttc.on_connect = generate_on_connect(args.topics)
+    mqttc.on_connect = generate_on_connect(topics)
     mqttc.on_message = on_message
 
     mqttc.connect(args.host, 1883, 60)

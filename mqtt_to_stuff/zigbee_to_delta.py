@@ -200,7 +200,7 @@ def generate_on_connect(topics):
 def main(args):
     start_http_server(9101)
     parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")
-    parser.add_argument("mqtt_host", help="The MQTT host address.")
+    parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
     parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
     parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=os.environ.get('INTERVAL', 60))

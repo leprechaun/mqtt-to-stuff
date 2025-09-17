@@ -157,6 +157,31 @@ class TradfriBulbHandler:
         }
 
 
+class ActionButtons:
+    timeseries_name = 'buttons'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split(" ")
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[1]
+        }
+
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'TS004F', # rotary
+            'ZG-101ZL' # simple push
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        return payload
+
+
 ZDR = ZigbeeDeviceRegister()
 
 bulbs = TradfriBulbHandler()
@@ -164,6 +189,10 @@ ZDR.add_handler(bulbs)
 
 thermometers = ThermometerAndHygrometer()
 ZDR.add_handler(thermometers)
+
+buttons = ActionButtons()
+ZDR.add_handler(buttons)
+
 
 def on_message(client, userdata, msg):
     if msg.topic.startswith('zigbee2mqtt/bridge/devices'):
@@ -173,11 +202,16 @@ def on_message(client, userdata, msg):
     elif msg.topic.startswith('zigbee2mqtt/'):
         split = msg.topic.split("/")
         maybe_friendly_name = split[1]
-        o = json.loads(msg.payload.decode('utf-8'))
+        try:
+            if len(split) == 2:
+                o = json.loads(msg.payload.decode('utf-8'))
+                ZDR.append(maybe_friendly_name, o)
+            else:
+                print(["not an update", split])
 
-        if len(split) == 2:
-            ZDR.append(maybe_friendly_name, o)
-
+        except json.decoder.JSONDecodeError as e:
+            print(["failed-to-parse", msg.topic, msg.payload.decode("utf-8")])
+            print(msg.payload.decode("utf-8"))
 
     else:
         print("msg", msg.topic, msg.payload.decode("utf-8"))

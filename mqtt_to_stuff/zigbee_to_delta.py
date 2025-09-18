@@ -38,14 +38,24 @@ class ZigbeeDeviceRegister:
         for name in self.timeseries:
             if len(self.timeseries[name]) > 0:
                 df = pl.DataFrame(self.timeseries[name]).with_columns(date=pl.col('timestamp').dt.date())
-                df.write_delta(
-                    base_path + name,
-                    mode="append",
-                    delta_write_options=write_options,
-                    storage_options=options
-                )
-                self.logger.info("wrote %s records to %s/%s" % (len(df), base_path, name))
-                self.timeseries[name].clear()
+                try:
+                    df.write_delta(
+                        base_path + name,
+                        mode="append",
+                        delta_write_options=write_options,
+                        storage_options=options
+                    )
+                    self.logger.info("wrote %s records to %s/%s" % (len(df), base_path, name))
+                    self.timeseries[name].clear()
+                except Exception as e:
+                    self.logger.warning(e)
+
+                    print(df)
+                    print(df.schema)
+
+                    csv_path = "/tmp/" + name + "-" + datetime.datetime.now().isoformat() + ".csv"
+                    df.write_csv(csv_path)
+                    self.logger.info("wrote %s records to %s" % (len(df), csv_path))
 
     def register_devices(self, device_definitions):
         for dd in device_definitions:

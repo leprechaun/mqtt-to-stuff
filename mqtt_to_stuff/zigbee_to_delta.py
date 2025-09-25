@@ -47,6 +47,13 @@ class ZigbeeDeviceRegister:
                     )
                     self.logger.info("wrote %s records to %s/%s" % (len(df), base_path, name))
                     self.timeseries[name].clear()
+
+                    dt = deltalake.DeltaTable(base_path + name, storage_options=options)
+
+                    if len(dt.file_uris()) >= 60:
+                        dt.optimize.compact()
+                        dt.create_checkpoint()
+
                 except Exception as e:
                     self.logger.warning(e)
                     self.logger.info("Typically a schema mismatch")

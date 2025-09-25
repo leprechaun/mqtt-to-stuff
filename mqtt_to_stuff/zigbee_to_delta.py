@@ -49,13 +49,15 @@ class ZigbeeDeviceRegister:
                     self.timeseries[name].clear()
                 except Exception as e:
                     self.logger.warning(e)
+                    self.logger.info("Typically a schema mismatch")
+                    self.logger.debug(df.schema)
 
                     print(df)
-                    print(df.schema)
 
                     csv_path = "/tmp/" + name + "-" + datetime.datetime.now().isoformat() + ".csv"
                     df.write_csv(csv_path)
                     self.logger.info("wrote %s records to %s" % (len(df), csv_path))
+                    self.timeseries[name].clear()
 
     def register_devices(self, device_definitions):
         for dd in device_definitions:
@@ -94,33 +96,59 @@ class ZigbeeDeviceRegister:
         if handler := self.device_mappings.get(friendly_name):
             cast_payload = handler.cast_payload(payload)
 
+            if id := handler.friendly_name_to_id(friendly_name):
+                id['timestamp'] = datetime.datetime.now()
 
-            id = handler.friendly_name_to_id(friendly_name)
-            id['timestamp'] = datetime.datetime.now()
+                id.update(cast_payload)
 
-            id.update(cast_payload)
+                self.timeseries[handler.timeseries_name].append(id)
+                self.logger.info(["appending", handler.timeseries_name, id])
 
-            #cast_payload['zone'] = 'home'
-            #cast_payload['area'] = id['area']
-            #cast_payload['thing'] = id['thing']
-
-
-            self.timeseries[handler.timeseries_name].append(id)
-            self.logger.info(["appending", handler.timeseries_name, id])
+            else:
+                self.logger.info(["not-appending", handler.timeseries_name, "%s didn't match to an id" % friendly_name])
         else:
             self.logger.info(["unsuported", friendly_name, payload])
 
+
+class ContactSensor:
+    timeseries_name = 'contact-sensors'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        if len(split_friendly_name) < 2:
+            return None
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'TS0203'
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        # {'battery': 100, 'battery_low': False, 'contact': True, 'linkquality': 72, 'tamper': False, 'vo
+        return payload
 
 class ThermometerAndHygrometer:
     timeseries_name = 'temperature-and-humidity'
 
     def friendly_name_to_id(self, friendly_name):
-        split_friendly_name = friendly_name.split(" ")
+        split_friendly_name = friendly_name.split("/")
+
+        if len(split_friendly_name) < 2:
+            return None
 
         return {
             "zone": "home",
             "area": split_friendly_name[0],
-            "thing": split_friendly_name[1]
+            "thing": split_friendly_name[2]
         }
 
     def match_device(self, device_definition):
@@ -143,12 +171,12 @@ class TradfriBulbHandler:
     timeseries_name = 'smart-bulbs'
 
     def friendly_name_to_id(self, friendly_name):
-        split_friendly_name = friendly_name.split(" ")
+        split_friendly_name = friendly_name.split("/")
 
         return {
             "zone": "home",
             "area": split_friendly_name[0],
-            "thing": split_friendly_name[1]
+            "thing": split_friendly_name[2]
         }
 
 
@@ -171,12 +199,12 @@ class ActionButtons:
     timeseries_name = 'buttons'
 
     def friendly_name_to_id(self, friendly_name):
-        split_friendly_name = friendly_name.split(" ")
+        split_friendly_name = friendly_name.split("/")
 
         return {
             "zone": "home",
             "area": split_friendly_name[0],
-            "thing": split_friendly_name[1]
+            "thing": split_friendly_name[2]
         }
 
 
@@ -192,6 +220,33 @@ class ActionButtons:
         return payload
 
 
+class MotionLuminance:
+    timeseries_name = 'motion-sensor'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'ZG-204ZL' # motion & luminance
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        #payload['motion'] = payload.get('occupancy')
+        #del payload['occupancy']
+        # {'battery': 100, 'illuminance': None, 'illuminance_interval': None, 'keep_time': None, 'linkquality': 84, 'occupancy': None, 'sensitivity': None}
+        return payload
+
+
 ZDR = ZigbeeDeviceRegister()
 
 bulbs = TradfriBulbHandler()
@@ -203,15 +258,32 @@ ZDR.add_handler(thermometers)
 buttons = ActionButtons()
 ZDR.add_handler(buttons)
 
+contact_sensors = ContactSensor()
+ZDR.add_handler(contact_sensors)
+
+motion_sensors = MotionLuminance()
+ZDR.add_handler(motion_sensors)
+
 
 def on_message(client, userdata, msg):
     if msg.topic.startswith('zigbee2mqtt/bridge/devices'):
         o = json.loads(msg.payload.decode('utf-8'))
         ZDR.register_devices(o)
 
+    elif msg.topic.startswith("zigbee2mqtt/bridge"):
+        print("don't care: %s" % msg.topic)
+        return
+
     elif msg.topic.startswith('zigbee2mqtt/'):
-        split = msg.topic.split("/")
+
+        all_split = msg.topic.split("/")
+        if all_split[-1] == 'set':
+            print(["not an update", all_split])
+            return
+
+        split = msg.topic.split("/", 1)
         maybe_friendly_name = split[1]
+
         try:
             if len(split) == 2:
                 o = json.loads(msg.payload.decode('utf-8'))

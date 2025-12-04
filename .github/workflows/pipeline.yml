@@ -20,7 +20,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - run: |
+      - name: Build & Push
+        run: |
           REPO="leprechaun/mqtt-to-stuff"
           IMAGE="${REGISTRY}/${REPO}"
 

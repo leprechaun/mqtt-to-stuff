@@ -114,3 +114,166 @@ class PresenceDetector(MonitoredDevice):
             ("iot_device_uptime", "uptime")
         ),
     }
+
+class ContactSensor:
+    timeseries_name = 'contact-sensors'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        if len(split_friendly_name) < 2:
+            return None
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'TS0203'
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        # {'battery': 100, 'battery_low': False, 'contact': True, 'linkquality': 72, 'tamper': False, 'vo
+        return payload
+
+class ThermometerAndHygrometer:
+    timeseries_name = 'temperature-and-humidity'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        if len(split_friendly_name) < 2:
+            return None
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'TS0201'
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        return {
+            "temperature": payload['temperature'],
+            "humidity": payload['humidity'],
+            "battery": payload['battery'],
+            "voltage": payload['voltage'],
+            "linkquality": payload['linkquality'],
+        }
+
+class TradfriBulbHandler:
+    timeseries_name = 'smart-bulbs'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'TRADFRI bulb E27 WW globe 806lm',
+            'TRADFRI bulb GU10 WW 345lm',
+            'CK-BL702-AL-01(7009_Z102LG03-1)',
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        return {
+            "on": True if payload['state'] == 'ON' else False,
+            "brightness": payload['brightness'],
+            "linkquality": payload['linkquality']
+        }
+
+
+class ActionButtons:
+    timeseries_name = 'buttons'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'TS004F', # rotary
+            'ZG-101ZL' # simple push
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        return payload
+
+
+class MotionLuminance:
+    timeseries_name = 'motion-sensor'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'ZG-204ZL' # motion & luminance
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        #payload['motion'] = payload.get('occupancy')
+        #del payload['occupancy']
+        # {'battery': 100, 'illuminance': None, 'illuminance_interval': None, 'keep_time': None, 'linkquality': 84, 'occupancy': None, 'sensitivity': None}
+        return payload
+
+class RainSensor:
+    timeseries_name = 'rain'
+
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'TS0207'
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        return payload
+
+

@@ -10,7 +10,9 @@ import logging
 import os
 import time
 import threading
+import code
 
+from devices import ActionButtons, ContactSensor, ThermometerAndHygrometer, TradfriBulbHandler, MotionLuminance
 
 logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
 
@@ -21,50 +23,46 @@ class ZigbeeDeviceRegister:
         self.device_mappings = {}
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    def set_deltalakeclient(self, dlc):
+        self.dlc = dlc
+
     def write_all_and_clear(self, base_path):
+        try:
+            for name in self.timeseries:
+                if len(self.timeseries[name]) > 0:
+                    self._write_timeseries(base_path,name, self.timeseries[name])
+        except Exception as e:
+            print(e)
+
+    def _write_timeseries(self, base_path, name, timeseries):
         write_options = {
             "writer_properties": deltalake.WriterProperties(compression="zstd"),
             "partition_by":['date']
         }
 
+        options = {}
         if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
-            options = {
-                "endpoint_url": S3_ENDPOINT
-            }
-        else:
-            options = {}
+            options["endpoint_url"] = S3_ENDPOINT
 
+        df = pl.DataFrame(timeseries).with_columns(date=pl.col('timestamp').dt.date())
 
-        for name in self.timeseries:
-            if len(self.timeseries[name]) > 0:
-                df = pl.DataFrame(self.timeseries[name]).with_columns(date=pl.col('timestamp').dt.date())
-                try:
-                    df.write_delta(
-                        base_path + name,
-                        mode="append",
-                        delta_write_options=write_options,
-                        storage_options=options
-                    )
-                    self.logger.info("wrote %s records to %s/%s" % (len(df), base_path, name))
-                    self.timeseries[name].clear()
+        try:
+            self.dlc.append(df, name, write_options)
+            timeseries.clear()
+            self.logger.info("wrote %s records to %s/%s" % (len(df), base_path, name))
 
-                    dt = deltalake.DeltaTable(base_path + name, storage_options=options)
+        except Exception as e:
+            self.logger.warning(e)
+            self.logger.info("Typically a schema mismatch")
+            self.logger.debug(df.schema)
 
-                    if len(dt.file_uris()) >= 60:
-                        dt.optimize.compact()
-                        dt.create_checkpoint()
+            print(df)
 
-                except Exception as e:
-                    self.logger.warning(e)
-                    self.logger.info("Typically a schema mismatch")
-                    self.logger.debug(df.schema)
+            csv_path = "/tmp/" + name + "-" + datetime.datetime.now().isoformat() + ".csv"
+            df.write_csv(csv_path)
+            self.logger.info("wrote %s records to %s" % (len(df), csv_path))
+            self.timeseries[name].clear()
 
-                    print(df)
-
-                    csv_path = "/tmp/" + name + "-" + datetime.datetime.now().isoformat() + ".csv"
-                    df.write_csv(csv_path)
-                    self.logger.info("wrote %s records to %s" % (len(df), csv_path))
-                    self.timeseries[name].clear()
 
     def register_devices(self, device_definitions):
         for dd in device_definitions:
@@ -80,9 +78,58 @@ class ZigbeeDeviceRegister:
                 )
             )
 
+        self._persist_device_mappings()
+
+    def _persist_device_mappings(self):
+        for_df = []
+
+        for (friendly_name, mapping) in self.device_mappings.items():
+            now = datetime.datetime.now()
+            for_df.append({
+                "timestamp": now,
+                "address": mapping['address'],
+                "manufacturer": mapping['manufacturer'],
+                "model": mapping['model'],
+                "friendly_name": friendly_name,
+            })
+
+        current = pl.DataFrame(for_df)
+
+        try:
+            previous = self.dlc.get("zigbee-devices")
+        except:
+            previous = None
+
+        if previous is None:
+            self.dlc.append(current, "zigbee-devices")
+            print("had nothing - write all of current")
+            print(current)
+
+        latest = previous.sort(by=['timestamp']).group_by(["address"], maintain_order=True).last()
+        anti = current.join(latest, on=['address','friendly_name'], how='anti')
+
+
+        print("latest")
+        print(latest)
+
+        if len(anti) > 0:
+            print("anti: should write this")
+            print(anti)
+
+            self.dlc.append(anti, 'zigbee-devices')
+        else:
+            print("nothing to write")
+
+
     def try_registering_device(self, device_definition):
         if handler := self._match_device_to_handler(device_definition):
-            self.device_mappings[device_definition.get('friendly_name')] = handler
+            #print(device_definition)
+            self.device_mappings[device_definition.get('friendly_name')] = {
+                "manufacturer": device_definition.get('manufacturer'),
+                "model": device_definition.get('model_id'),
+                "address": device_definition.get('ieee_address'),
+                "handler": handler
+            }
             return True
 
         else:
@@ -100,10 +147,13 @@ class ZigbeeDeviceRegister:
         self.handlers[handler.__class__.__name__] = handler
 
     def append(self, friendly_name, payload):
-        if handler := self.device_mappings.get(friendly_name):
+        if handler_and_address := self.device_mappings.get(friendly_name):
+            handler = handler_and_address['handler']
+            address = handler_and_address['address']
             cast_payload = handler.cast_payload(payload)
 
             if id := handler.friendly_name_to_id(friendly_name):
+                id['address'] = address
                 id['timestamp'] = datetime.datetime.now()
 
                 id.update(cast_payload)
@@ -115,143 +165,6 @@ class ZigbeeDeviceRegister:
                 self.logger.info(["not-appending", handler.timeseries_name, "%s didn't match to an id" % friendly_name])
         else:
             self.logger.info(["unsuported", friendly_name, payload])
-
-
-class ContactSensor:
-    timeseries_name = 'contact-sensors'
-
-    def friendly_name_to_id(self, friendly_name):
-        split_friendly_name = friendly_name.split("/")
-
-        if len(split_friendly_name) < 2:
-            return None
-
-        return {
-            "zone": "home",
-            "area": split_friendly_name[0],
-            "thing": split_friendly_name[2]
-        }
-
-    def match_device(self, device_definition):
-        model_ids = [
-            'TS0203'
-        ]
-
-        return device_definition.get('model_id') in model_ids
-
-    def cast_payload(self, payload):
-        # {'battery': 100, 'battery_low': False, 'contact': True, 'linkquality': 72, 'tamper': False, 'vo
-        return payload
-
-class ThermometerAndHygrometer:
-    timeseries_name = 'temperature-and-humidity'
-
-    def friendly_name_to_id(self, friendly_name):
-        split_friendly_name = friendly_name.split("/")
-
-        if len(split_friendly_name) < 2:
-            return None
-
-        return {
-            "zone": "home",
-            "area": split_friendly_name[0],
-            "thing": split_friendly_name[2]
-        }
-
-    def match_device(self, device_definition):
-        model_ids = [
-            'TS0201'
-        ]
-
-        return device_definition.get('model_id') in model_ids
-
-    def cast_payload(self, payload):
-        return {
-            "temperature": payload['temperature'],
-            "humidity": payload['humidity'],
-            "battery": payload['battery'],
-            "voltage": payload['voltage'],
-            "linkquality": payload['linkquality'],
-        }
-
-class TradfriBulbHandler:
-    timeseries_name = 'smart-bulbs'
-
-    def friendly_name_to_id(self, friendly_name):
-        split_friendly_name = friendly_name.split("/")
-
-        return {
-            "zone": "home",
-            "area": split_friendly_name[0],
-            "thing": split_friendly_name[2]
-        }
-
-
-    def match_device(self, device_definition):
-        model_ids = [
-            'TRADFRI bulb E27 WW globe 806lm'
-        ]
-
-        return device_definition.get('model_id') in model_ids
-
-    def cast_payload(self, payload):
-        return {
-            "on": True if payload['state'] == 'ON' else False,
-            "brightness": payload['brightness'],
-            "linkquality": payload['linkquality']
-        }
-
-
-class ActionButtons:
-    timeseries_name = 'buttons'
-
-    def friendly_name_to_id(self, friendly_name):
-        split_friendly_name = friendly_name.split("/")
-
-        return {
-            "zone": "home",
-            "area": split_friendly_name[0],
-            "thing": split_friendly_name[2]
-        }
-
-
-    def match_device(self, device_definition):
-        model_ids = [
-            'TS004F', # rotary
-            'ZG-101ZL' # simple push
-        ]
-
-        return device_definition.get('model_id') in model_ids
-
-    def cast_payload(self, payload):
-        return payload
-
-
-class MotionLuminance:
-    timeseries_name = 'motion-sensor'
-
-    def friendly_name_to_id(self, friendly_name):
-        split_friendly_name = friendly_name.split("/")
-
-        return {
-            "zone": "home",
-            "area": split_friendly_name[0],
-            "thing": split_friendly_name[2]
-        }
-
-
-    def match_device(self, device_definition):
-        model_ids = [
-            'ZG-204ZL' # motion & luminance
-        ]
-
-        return device_definition.get('model_id') in model_ids
-
-    def cast_payload(self, payload):
-        #payload['motion'] = payload.get('occupancy')
-        #del payload['occupancy']
-        # {'battery': 100, 'illuminance': None, 'illuminance_interval': None, 'keep_time': None, 'linkquality': 84, 'occupancy': None, 'sensitivity': None}
-        return payload
 
 
 ZDR = ZigbeeDeviceRegister()
@@ -270,6 +183,47 @@ ZDR.add_handler(contact_sensors)
 
 motion_sensors = MotionLuminance()
 ZDR.add_handler(motion_sensors)
+
+
+class DeltaLakeClient:
+    def __init__(self, base_path, storage_options):
+        self._base_path = base_path
+        self._storage_options = storage_options
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def get(self, path):
+        p = self._base_path + path
+        print("going to read", p)
+        return pl.read_delta(
+            p,
+            storage_options = self._storage_options
+        )
+
+    # self.dlc.write(df, name, write_options)
+    def append(self, df, path, write_options = None):
+        if write_options is None:
+            write_options = {}
+
+        write_options.update({
+            "writer_properties": deltalake.WriterProperties(compression="zstd"),
+        })
+
+        df.write_delta(
+            self._base_path + path,
+            delta_write_options = write_options,
+            storage_options = self._storage_options,
+            mode = "append"
+        )
+
+        dt = deltalake.DeltaTable(
+            self._base_path + path,
+            storage_options = self._storage_options
+        )
+
+        if len(dt.file_uris()) >= 60:
+            dt.optimize.compact()
+            dt.create_checkpoint()
+            self.logger.info("Compacting")
 
 
 def on_message(client, userdata, msg):
@@ -334,6 +288,19 @@ def main(args):
         daemon=True
     )
     batch_thread.start()
+
+    options = {}
+    if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
+        options["endpoint_url"] = S3_ENDPOINT
+
+    options["AWS_SESSION_TOKEN"] = os.environ.get('AWS_SESSION_TOKEN', "")
+
+    print(options)
+
+    dlc = DeltaLakeClient(args.delta_path, options)
+
+    ZDR.set_deltalakeclient(dlc)
+
 
 
     topics = ["zigbee2mqtt/#"]

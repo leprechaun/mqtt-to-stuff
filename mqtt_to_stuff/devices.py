@@ -277,7 +277,7 @@ class RainSensor:
         return payload
 
 class VINDSTYRKA:
-    timeseries_name: "air-quality"
+    timeseries_name = 'air-quality'
 
     def friendly_name_to_id(self, friendly_name):
         split_friendly_name = friendly_name.split("/")

@@ -276,4 +276,30 @@ class RainSensor:
     def cast_payload(self, payload):
         return payload
 
+class VINDSTYRKA:
+    timeseries_name: "air-quality"
 
+    def friendly_name_to_id(self, friendly_name):
+        split_friendly_name = friendly_name.split("/")
+
+        return {
+            "zone": "home",
+            "area": split_friendly_name[0],
+            "thing": split_friendly_name[2]
+        }
+
+    def match_device(self, device_definition):
+        model_ids = [
+            'VINDSTYRKA'
+        ]
+
+        return device_definition.get('model_id') in model_ids
+
+    def cast_payload(self, payload):
+        return {
+            "humidity": payload["humidity"],
+            "temperature": payload["temperature"],
+            "pm25": payload["linkquality"],
+            "voc_index": payload["voc_index"],
+            "linkquality": payload["linkquality"],
+        }

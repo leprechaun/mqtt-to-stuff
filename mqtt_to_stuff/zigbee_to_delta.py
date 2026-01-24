@@ -12,7 +12,7 @@ import time
 import threading
 import code
 
-from devices import ActionButtons, ContactSensor, ThermometerAndHygrometer, TradfriBulbHandler, MotionLuminance
+from devices import ActionButtons, ContactSensor, ThermometerAndHygrometer, TradfriBulbHandler, MotionLuminance, VINDSTYRKA
 
 logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
 
@@ -183,6 +183,9 @@ ZDR.add_handler(contact_sensors)
 
 motion_sensors = MotionLuminance()
 ZDR.add_handler(motion_sensors)
+
+vindstyrka = VINDSTYRKA()
+ZDR.add_handler(vindstyrka)
 
 
 class DeltaLakeClient:

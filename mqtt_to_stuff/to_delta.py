@@ -11,7 +11,7 @@ import signal
 from typing import Dict, Tuple
 from collections.abc import Callable
 
-from devices import MonitoringPlug, PresenceDetector
+from devices import MonitoringPlug, PresenceDetector, MultiPresenceDetector
 from register import DeviceRegister, Series
 
 def generate_on_connect(topics):
@@ -80,17 +80,20 @@ def main(args):
     register = DeviceRegister()
     register.add_device_type("plug", MonitoringPlug)
     register.add_device_type("presence", PresenceDetector)
+    register.add_device_type("multi-presence", MultiPresenceDetector)
 
 
     uptime = Series("iot_device_uptime")
     habitat = Series("habitat")
     presence = Series("presence")
+    multi_presence = Series("multi-presence")
     electricity = Series("electricity")
 
     series = [
         uptime,
         electricity,
         presence,
+        multi_presence,
         habitat
     ]
 

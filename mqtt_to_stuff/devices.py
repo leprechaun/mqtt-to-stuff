@@ -97,6 +97,19 @@ class MonitoringPlug(MonitoredDevice):
         ),
     }
 
+class MultiPresenceDetector(MonitoredDevice):
+    sensors = {}
+
+    def __init__(self, device_key):
+        super().__init__(device_key)
+
+        for target_index in [1, 2, 3]:
+            for prop in ["x", "y", "distance", "angle"]:
+                self.sensors[("sensor", f"target-{target_index}_{prop}", "state")] = (
+                    ChangeFilter(),
+                    ("multi-presence", f"target_{target_index}_{prop}")
+                )
+
 class PresenceDetector(MonitoredDevice):
     sensors = {
         ("binary_sensor", "occupancy", "state"): (

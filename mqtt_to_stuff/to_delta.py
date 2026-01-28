@@ -105,6 +105,7 @@ def main(args):
         try:
             payload = msg.payload.decode("utf-8")
             _, zone, area, kind, thing, *rest = msg.topic.split("/")
+            print(datetime.datetime.now(),msg.topic, payload)
             key = (("zone", zone), ("area", area), ("thing", thing))
             register.append_data(kind, key, tuple(rest), payload)
 

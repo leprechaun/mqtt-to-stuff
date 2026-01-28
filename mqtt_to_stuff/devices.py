@@ -14,7 +14,7 @@ class ChangeFilter:
             self._previous_value = cast
             return cast
 
-        print("set: return none - values equal", value, cast, self._previous_value)
+        #print("set: return none - values equal", value, cast, self._previous_value)
         self._previous_value = cast
         return None
 
@@ -98,13 +98,34 @@ class MonitoringPlug(MonitoredDevice):
     }
 
 class MultiPresenceDetector(MonitoredDevice):
-    sensors = {}
+    sensors = {
+        ("sensor", "uptime_sensor", "state"): (
+            ChangeFilter(int),
+            ("iot_device_uptime", "uptime")
+        ),
+        ("binary_sensor", "presence", "state"): (
+            ChangeFilter(lambda x: True if x == "ON" else False),
+            ("multi-presence", "occupancy")
+        ),
+        ("sensor", "presence_target_count", "state"): (
+            ChangeFilter(int),
+            ("multi-presence", "presence_target_count")
+        ),
+        ("sensor", "still_target_count", "state"): (
+            ChangeFilter(int),
+            ("multi-presence", "still_target_count")
+        ),
+        ("sensor", "moving_target_count", "state"): (
+            ChangeFilter(int),
+            ("multi-presence", "moving_target_count")
+        ),
+    }
 
     def __init__(self, device_key):
         super().__init__(device_key)
 
         for target_index in [1, 2, 3]:
-            for prop in ["x", "y", "distance", "angle"]:
+            for prop in ["x", "y", "distance", "angle", "speed"]:
                 self.sensors[("sensor", f"target-{target_index}_{prop}", "state")] = (
                     ChangeFilter(),
                     ("multi-presence", f"target_{target_index}_{prop}")

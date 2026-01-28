@@ -7,6 +7,7 @@ import os
 import threading
 import time
 import signal
+import datetime
 
 from typing import Dict, Tuple
 from collections.abc import Callable
@@ -83,11 +84,11 @@ def main(args):
     register.add_device_type("multi-presence", MultiPresenceDetector)
 
 
-    uptime = Series("iot_device_uptime")
-    habitat = Series("habitat")
-    presence = Series("presence")
-    multi_presence = Series("multi-presence")
-    electricity = Series("electricity")
+    uptime = Series("iot_device_uptime", 1)
+    habitat = Series("habitat", 1)
+    presence = Series("presence", 1)
+    multi_presence = Series("multi-presence", 0.6)
+    electricity = Series("electricity", 1)
 
     series = [
         uptime,

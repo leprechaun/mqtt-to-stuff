@@ -23,7 +23,8 @@ class DeviceRegister:
                 else:
                     raise Exception("Undefined series: %s" % series_name)
             else:
-                print("series_and_record falsy", series_and_record)
+                #print("series_and_record falsy", series_and_record)
+                pass
         else:
             print("device falsy")
 
@@ -47,9 +48,11 @@ class DeviceRegister:
 
 
 class Series:
-    def __init__(self, name):
+    def __init__(self, name, throttle : int | float | None = None):
         self.name = name
         self.records = []
+        self.last_updates_by_source = {}
+        self.throttle = throttle
 
     def append(self, timestamp, source, record):
         thing = (
@@ -57,8 +60,21 @@ class Series:
             source,
             record
         )
-        print("appended:", self.name, thing[1])
-        self.records.append(thing)
+        #print(datetime.datetime.now(), "appended:", self.name, thing[1], record)
+
+        throttled = False
+
+        last_update = self.last_updates_by_source.get(source, 0)
+
+        if self.throttle is not None and last_update > 0:
+            if timestamp.timestamp() < (last_update + self.throttle):
+                throttled = True
+
+        if not throttled:
+            self.records.append(thing)
+            self.last_updates_by_source[source] = timestamp.timestamp()
+            print(timestamp, source, record)
+
 
     def to_list(self):
         return [ dict(**{"timestamp": r[0][1]}, **dict(r[1]), **dict(r[2])) for r in self.records ]

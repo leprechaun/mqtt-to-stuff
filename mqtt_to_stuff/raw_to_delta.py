@@ -37,6 +37,8 @@ class DeltaLakeClient:
             mode="append",
         )
 
+        self._logger.info("Wrote %s records to %s", len(df), self._base_path + path)
+
         dt = deltalake.DeltaTable(self._base_path + path, storage_options=self._storage_options)
         if len(dt.file_uris()) >= 60:
             dt.optimize.compact()
@@ -72,7 +74,6 @@ def do_flush(dlc):
     try:
         df = pl.DataFrame(batch).with_columns(date=pl.col("arrival_timestamp").dt.date())
         dlc.append(df, "raw-mqtt", {"partition_by": ["date"]})
-        logger.info("Wrote %d records to raw-mqtt", len(df))
     except Exception:
         logger.exception("Failed to write batch to Delta Lake")
 

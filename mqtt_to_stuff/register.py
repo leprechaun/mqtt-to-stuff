@@ -26,7 +26,8 @@ class DeviceRegister:
                 #print("series_and_record falsy", series_and_record)
                 pass
         else:
-            print("device falsy")
+            #print("device falsy")
+            pass
 
     def get_or_create(self, kind, key):
         kind_with_key = (kind, key)
@@ -73,7 +74,7 @@ class Series:
         if not throttled:
             self.records.append(thing)
             self.last_updates_by_source[source] = timestamp.timestamp()
-            print(timestamp, source, record)
+            #print(timestamp, source, record)
 
 
     def to_list(self):

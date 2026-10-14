@@ -51,10 +51,10 @@ class MonitoredDevice:
                 if len(record) == len(series_columns):
                     return (series_name, list(record.items()))
                 else:
-                    print(self.device_key, series_name, "specified", series_name + "." + column_name, "=", value, "missing:", column_keys-record_keys)
+                    True
+                    #print(self.device_key, series_name, "specified", series_name + "." + column_name, "=", value, "missing:", column_keys-record_keys)
 
         return None
-
 
 class MonitoringPlug(MonitoredDevice):
     sensors = {

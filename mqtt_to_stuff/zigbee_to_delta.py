@@ -235,14 +235,12 @@ def on_message(client, userdata, msg):
         ZDR.register_devices(o)
 
     elif msg.topic.startswith("zigbee2mqtt/bridge"):
-        print("don't care: %s" % msg.topic)
         return
 
     elif msg.topic.startswith('zigbee2mqtt/'):
 
         all_split = msg.topic.split("/")
         if all_split[-1] == 'set':
-            print(["not an update", all_split])
             return
 
         split = msg.topic.split("/", 1)
@@ -252,16 +250,10 @@ def on_message(client, userdata, msg):
             if len(split) == 2:
                 o = json.loads(msg.payload.decode('utf-8'))
                 ZDR.append(maybe_friendly_name, o)
-            else:
-                print(["not an update", split])
 
         except json.decoder.JSONDecodeError as e:
             print(["failed-to-parse", msg.topic, msg.payload.decode("utf-8")])
             print(msg.payload.decode("utf-8"))
-
-    else:
-        print("msg", msg.topic, msg.payload.decode("utf-8"))
-        pass
 
 def periodic_batch_writer(register, base_path, interval):
     while True:

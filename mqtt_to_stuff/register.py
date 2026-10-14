@@ -61,7 +61,6 @@ class Series:
             source,
             record
         )
-        #print(datetime.datetime.now(), "appended:", self.name, thing[1], record)
 
         throttled = False
 
@@ -74,7 +73,6 @@ class Series:
         if not throttled:
             self.records.append(thing)
             self.last_updates_by_source[source] = timestamp.timestamp()
-            #print(timestamp, source, record)
 
 
     def to_list(self):

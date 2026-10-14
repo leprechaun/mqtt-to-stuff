@@ -159,7 +159,7 @@ class ZigbeeDeviceRegister:
                 id.update(cast_payload)
 
                 self.timeseries[handler.timeseries_name].append(id)
-                self.logger.info(["appending", handler.timeseries_name, id])
+                self.logger.debug(["appending", handler.timeseries_name, id])
 
             else:
                 self.logger.info(["not-appending", handler.timeseries_name, "%s didn't match to an id" % friendly_name])

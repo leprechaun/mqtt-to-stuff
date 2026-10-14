@@ -23,8 +23,6 @@ def generate_on_connect(topics):
     return on_connect
 
 def write(register, base_path):
-    print("going to write", base_path)
-
     write_options = {
         "writer_properties": deltalake.WriterProperties(compression="zstd"),
         "partition_by":['date']

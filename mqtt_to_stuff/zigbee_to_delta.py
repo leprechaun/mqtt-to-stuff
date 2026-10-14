@@ -14,7 +14,7 @@ import code
 
 from devices import ActionButtons, ContactSensor, ThermometerAndHygrometer, TradfriBulbHandler, MotionLuminance, VINDSTYRKA
 
-logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
+logging.basicConfig(encoding='utf-8', level=logging.INFO)
 
 class ZigbeeDeviceRegister:
     def __init__(self):

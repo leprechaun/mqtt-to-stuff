@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 
 from mqtt_to_stuff.devices import ThermometerAndHygrometer, TradfriBulbHandler
+from mqtt_to_stuff.logging_setup import configure_logging
 from mqtt_to_stuff.zigbee_to_delta import ZigbeeDeviceRegister, on_message, parse_args
 
 DEVICE_DEFINITION = {
@@ -20,10 +21,11 @@ DEVICE_DEFINITION = {
 
 
 class FakeDeltaLakeClient:
-    def __init__(self, existing=None, raise_on_get=False):
+    def __init__(self, existing=None, raise_on_get=False, base_path="s3://bucket/prefix/"):
         self.append_calls = []
         self.existing = existing
         self.raise_on_get = raise_on_get
+        self.base_path = base_path
 
     def get(self, path):
         if self.raise_on_get:
@@ -153,7 +155,7 @@ def test_write_timeseries_falls_back_to_csv_on_schema_mismatch():
     reg = make_register(RaisingDlc())
     reg.timeseries["temperature-and-humidity"] = [{"timestamp": datetime.datetime(2026, 1, 1), "temperature": 1}]
 
-    reg._write_timeseries("base", "temperature-and-humidity", reg.timeseries["temperature-and-humidity"])
+    reg._write_timeseries("temperature-and-humidity", reg.timeseries["temperature-and-humidity"])
 
     csv_files = glob.glob("/tmp/temperature-and-humidity-*.csv")
     try:
@@ -162,6 +164,20 @@ def test_write_timeseries_falls_back_to_csv_on_schema_mismatch():
     finally:
         for f in csv_files:
             os.remove(f)
+
+
+def test_write_timeseries_logs_absolute_path_on_success(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    configure_logging()
+
+    dlc = FakeDeltaLakeClient(base_path="s3://bucket/prefix/")
+    reg = make_register(dlc)
+    reg.timeseries["temperature-and-humidity"] = [{"timestamp": datetime.datetime(2026, 1, 1), "temperature": 1}]
+
+    reg._write_timeseries("temperature-and-humidity", reg.timeseries["temperature-and-humidity"])
+
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["path"] == "s3://bucket/prefix/temperature-and-humidity"
 
 
 def test_parse_args_interval_default(monkeypatch):

@@ -36,15 +36,15 @@ class ZigbeeDeviceRegister:
     def set_deltalakeclient(self, dlc):
         self.dlc = dlc
 
-    def write_all_and_clear(self, base_path):
+    def write_all_and_clear(self):
         try:
             for name in self.timeseries:
                 if len(self.timeseries[name]) > 0:
-                    self._write_timeseries(base_path,name, self.timeseries[name])
+                    self._write_timeseries(name, self.timeseries[name])
         except Exception:
             self.logger.exception("write_all_and_clear failed")
 
-    def _write_timeseries(self, base_path, name, timeseries):
+    def _write_timeseries(self, name, timeseries):
         write_options = {
             "writer_properties": deltalake.WriterProperties(compression="zstd"),
             "partition_by":['date']
@@ -55,7 +55,7 @@ class ZigbeeDeviceRegister:
         try:
             self.dlc.append(df, name, write_options)
             timeseries.clear()
-            self.logger.info("wrote records", extra={"rows": len(df), "path": f"{base_path}/{name}"})
+            self.logger.info("wrote records", extra={"rows": len(df), "path": self.dlc.base_path + name})
 
         except Exception as e: #noqa
             self.logger.warning("write failed", extra={"error": str(e)})
@@ -225,10 +225,10 @@ def on_message(client, userdata, msg):
         except json.decoder.JSONDecodeError:
             logger.exception("failed to parse", extra={"topic": msg.topic, "payload": msg.payload.decode("utf-8")})
 
-def periodic_batch_writer(register, base_path, interval):
+def periodic_batch_writer(register, interval):
     while True:
         time.sleep(interval)
-        register.write_all_and_clear(base_path)
+        register.write_all_and_clear()
 
 
 def parse_args(argv=None):
@@ -243,8 +243,8 @@ def main(args):
 
     # Start periodic batch writer thread
     batch_thread = threading.Thread(
-        target=periodic_batch_writer, 
-        args=(ZDR, args.delta_path, args.interval), 
+        target=periodic_batch_writer,
+        args=(ZDR, args.interval),
         daemon=True
     )
     batch_thread.start()
@@ -276,6 +276,6 @@ def main(args):
     mqttc.loop_forever()
 
     logger.info("Flushing remaining messages before exit")
-    ZDR.write_all_and_clear(args.delta_path)
+    ZDR.write_all_and_clear()
 
     return 0

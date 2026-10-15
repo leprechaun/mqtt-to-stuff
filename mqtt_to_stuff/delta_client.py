@@ -11,6 +11,10 @@ class DeltaLakeClient:
         self._compact_at = compact_at
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    @property
+    def base_path(self):
+        return self._base_path
+
     def get(self, path):
         p = self._base_path + path
         self.logger.info("going to read", extra={"path": p})
@@ -38,4 +42,4 @@ class DeltaLakeClient:
         if len(dt.file_uris()) >= self._compact_at:
             dt.optimize.compact()
             dt.create_checkpoint()
-            self.logger.info("compacted", extra={"path": path})
+            self.logger.info("compacted", extra={"path": self._base_path + path})

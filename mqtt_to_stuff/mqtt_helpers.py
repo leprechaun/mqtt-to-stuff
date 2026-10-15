@@ -7,6 +7,6 @@ def generate_on_connect(topics):
     def on_connect(client, userdata, flags, reason_code, properties):
         for topic in topics:
             client.subscribe(topic)
-        logger.info("Connected, subscribed to %s", topics)
+        logger.info("connected, subscribed", extra={"topics": topics})
 
     return on_connect

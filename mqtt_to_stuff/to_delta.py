@@ -47,7 +47,7 @@ def on_message(client, userdata, msg):
         register.append_data(kind, key, tuple(rest), payload)
 
     except ValueError:
-        logger.exception("exception: %s", msg.topic)
+        logger.exception("failed to parse topic", extra={"topic": msg.topic})
         return
 
 

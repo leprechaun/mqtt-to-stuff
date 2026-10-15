@@ -13,7 +13,10 @@ class ChangeFilter:
         cast = self.cast(value)
 
         if self._previous_value != cast:
-            logger.debug("set: return cast value - values different %s %s %s", value, cast, self._previous_value)
+            logger.debug(
+                "value changed",
+                extra={"raw_value": value, "cast_value": cast, "previous_value": self._previous_value},
+            )
             self._previous_value = cast
             return cast
 

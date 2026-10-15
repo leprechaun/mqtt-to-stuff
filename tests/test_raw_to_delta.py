@@ -1,9 +1,11 @@
 import datetime
+import json
 from types import SimpleNamespace
 
 import pytest
 
 from mqtt_to_stuff import raw_to_delta
+from mqtt_to_stuff.logging_setup import configure_logging
 
 
 class FakeDeltaLakeClient:
@@ -93,3 +95,49 @@ def test_do_flush_swallows_append_errors():
     # Note: the buffer is cleared before the write is attempted, so a failed
     # write currently drops the batch rather than retrying it.
     assert raw_to_delta.buffer == []
+
+
+def test_on_message_logs_structured_fields_for_ignored_topic(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    configure_logging()
+
+    msg = SimpleNamespace(topic="zigbee2mqtt/foo", payload=b"hello", retain=False)
+    raw_to_delta.on_message(None, ["zigbee2mqtt/#"], msg)
+
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["topic"] == "zigbee2mqtt/foo"
+
+
+def test_on_message_logs_structured_fields_for_buffered_message(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    configure_logging()
+
+    msg = SimpleNamespace(topic="devices/home/kitchen/plug/plug1", payload=b"1.23", retain=True)
+    raw_to_delta.on_message(None, [], msg)
+
+    payload = json.loads(capsys.readouterr().out.strip())
+    assert payload["topic"] == "devices/home/kitchen/plug/plug1"
+    assert payload["retain"] is True
+    # The raw payload should not leak into the log message itself.
+    assert "1.23" not in payload["message"]
+
+
+def test_do_flush_logs_batch_size_on_failure(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    configure_logging()
+
+    raw_to_delta.buffer.append({
+        "topic": "t",
+        "arrival_timestamp": datetime.datetime(2026, 1, 1),
+        "payload": "p",
+        "retain": False,
+    })
+
+    dlc = FakeDeltaLakeClient(raise_on_append=True)
+    raw_to_delta.do_flush(dlc)
+
+    out = capsys.readouterr().out.strip()
+    payload = json.loads(out.splitlines()[-1])
+    assert payload["batch_size"] == 1

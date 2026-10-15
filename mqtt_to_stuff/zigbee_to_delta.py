@@ -55,17 +55,17 @@ class ZigbeeDeviceRegister:
         try:
             self.dlc.append(df, name, write_options)
             timeseries.clear()
-            self.logger.info(f"wrote {len(df)} records to {base_path}/{name}")
+            self.logger.info("wrote records", extra={"rows": len(df), "path": f"{base_path}/{name}"})
 
         except Exception as e: #noqa
-            self.logger.warning(e)
+            self.logger.warning("write failed", extra={"error": str(e)})
             self.logger.info("Typically a schema mismatch")
             self.logger.debug(df.schema)
             self.logger.debug("%s", df)
 
             csv_path = "/tmp/" + name + "-" + datetime.datetime.now().isoformat() + ".csv"
             df.write_csv(csv_path)
-            self.logger.info(f"wrote {len(df)} records to {csv_path}")
+            self.logger.info("wrote records to csv fallback", extra={"rows": len(df), "path": csv_path})
             self.timeseries[name].clear()
 
 
@@ -74,13 +74,14 @@ class ZigbeeDeviceRegister:
             result = self.try_registering_device(dd)
 
             self.logger.info(
-                "t: '{}', a: '{}', n: '{}', m: '{}' - supported = {}".format(
-                    dd['type'],
-                    dd['ieee_address'],
-                    dd['friendly_name'],
-                    dd.get('model_id'),
-                    result
-                )
+                "device discovered",
+                extra={
+                    "type": dd['type'],
+                    "address": dd['ieee_address'],
+                    "friendly_name": dd['friendly_name'],
+                    "model_id": dd.get('model_id'),
+                    "supported": result,
+                },
             )
 
         self._persist_device_mappings()
@@ -165,12 +166,15 @@ class ZigbeeDeviceRegister:
                 id.update(cast_payload)
 
                 self.timeseries[handler.timeseries_name].append(id)
-                self.logger.debug(["appending", handler.timeseries_name, id])
+                self.logger.debug("appending", extra={"timeseries_name": handler.timeseries_name, "record": id})
 
             else:
-                self.logger.info(["not-appending", handler.timeseries_name, f"{friendly_name} didn't match to an id"])
+                self.logger.info(
+                    "not appending - friendly name did not resolve to an id",
+                    extra={"timeseries_name": handler.timeseries_name, "friendly_name": friendly_name},
+                )
         else:
-            self.logger.info(["unsuported", friendly_name, payload])
+            self.logger.info("unsupported device", extra={"friendly_name": friendly_name, "payload": payload})
 
 
 ZDR = ZigbeeDeviceRegister()
@@ -219,7 +223,7 @@ def on_message(client, userdata, msg):
                 zdr.append(maybe_friendly_name, o)
 
         except json.decoder.JSONDecodeError:
-            logger.exception("failed to parse %s: %s", msg.topic, msg.payload.decode("utf-8"))
+            logger.exception("failed to parse", extra={"topic": msg.topic, "payload": msg.payload.decode("utf-8")})
 
 def periodic_batch_writer(register, base_path, interval):
     while True:
@@ -247,7 +251,7 @@ def main(args):
 
     options = build_storage_options(include_session_token=True)
 
-    logger.info("%s", options)
+    logger.info("storage options configured", extra={"storage_options": options})
 
     dlc = DeltaLakeClient(args.delta_path, options)
 
@@ -261,7 +265,7 @@ def main(args):
     mqttc.user_data_set(ZDR)
 
     def handle_shutdown(signum, frame):
-        logger.info("Received signal %d, shutting down", signum)
+        logger.info("received signal, shutting down", extra={"signum": signum})
         mqttc.disconnect()
 
     signal.signal(signal.SIGTERM, handle_shutdown)

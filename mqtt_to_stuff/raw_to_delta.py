@@ -22,11 +22,11 @@ buffer_lock = threading.Lock()
 def on_message(client, userdata, msg):
     ignored_topics = userdata or []
     if any(mqtt.topic_matches_sub(pattern, msg.topic) for pattern in ignored_topics):
-        logger.debug("ignored %s", msg.topic)
+        logger.debug("ignored", extra={"topic": msg.topic})
         return
 
     payload = msg.payload.decode("utf-8", errors="replace")
-    logger.debug("recv %s retain=%s %s", msg.topic, bool(msg.retain), payload)
+    logger.debug("recv", extra={"topic": msg.topic, "retain": bool(msg.retain)})
     record = {
         "topic": msg.topic,
         "arrival_timestamp": datetime.datetime.now(),
@@ -48,7 +48,7 @@ def do_flush(dlc):
         df = pl.DataFrame(batch).with_columns(date=pl.col("arrival_timestamp").dt.date())
         dlc.append(df, "raw-mqtt", {"partition_by": ["date"]})
     except Exception:
-        logger.exception("Failed to write batch to Delta Lake")
+        logger.exception("Failed to write batch to Delta Lake", extra={"batch_size": len(batch)})
 
 
 def flush_buffer(dlc, interval):
@@ -81,7 +81,7 @@ def main(args):
     mqttc.user_data_set(args.ignored_topics)
 
     def handle_shutdown(signum, frame):
-        logger.info("Received signal %d, shutting down", signum)
+        logger.info("received signal, shutting down", extra={"signum": signum})
         mqttc.disconnect()
 
     signal.signal(signal.SIGTERM, handle_shutdown)

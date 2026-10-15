@@ -22,5 +22,5 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.13.0"
 marimo = "^0.15.5"
-altair = "^5.5.0"
+altair = "^6.0.0"
 

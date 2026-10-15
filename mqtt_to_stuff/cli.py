@@ -1,6 +1,7 @@
 import sys
 
 from . import raw_to_delta, to_delta, zigbee_to_delta
+from .logging_setup import configure_logging
 
 WORKERS = {
     "zigbee": zigbee_to_delta.main,
@@ -10,6 +11,8 @@ WORKERS = {
 
 
 def cli():
+    configure_logging()
+
     if len(sys.argv) < 2 or sys.argv[1] not in WORKERS:
         sys.stderr.write(f"usage: mqtt-to-stuff {{{','.join(WORKERS)}}} [args...]\n")
         sys.exit(2)

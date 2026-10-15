@@ -23,7 +23,6 @@ from .devices import (
 )
 from .mqtt_helpers import generate_on_connect
 
-logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ZigbeeDeviceRegister:

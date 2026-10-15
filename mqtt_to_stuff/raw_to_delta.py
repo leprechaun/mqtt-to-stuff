@@ -13,7 +13,6 @@ from .cli_args import add_common_arguments
 from .delta_client import DeltaLakeClient
 from .mqtt_helpers import generate_on_connect
 
-logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 buffer = []

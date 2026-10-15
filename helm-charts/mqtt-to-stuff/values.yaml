@@ -62,5 +62,7 @@ tolerations: []
 affinity: {}
 
 config:
-  env: {}
+  env:
+    LOG_FORMAT: json
+    LOG_LEVEL: INFO
   secrets: {}

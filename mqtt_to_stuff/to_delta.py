@@ -15,7 +15,6 @@ from .devices import MonitoringPlug, MultiPresenceDetector, PresenceDetector
 from .mqtt_helpers import generate_on_connect
 from .register import DeviceRegister, Series
 
-logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def write(register, dlc):

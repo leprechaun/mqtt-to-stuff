@@ -1,6 +1,6 @@
-from collections import defaultdict
-import datetime
 import logging
+from collections import defaultdict
+from typing import ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class ChangeFilter:
 
 
 class MonitoredDevice:
-    sensors = {}
+    sensors: ClassVar[dict] = {}
 
     def __init__(self, device_key):
         self.device_key = device_key
@@ -47,20 +47,17 @@ class MonitoredDevice:
                 record = self.series[series_name]
                 series_columns = [x[1][1] for x in self.sensors.values() if x[1][0] == series_name]
 
-                record_keys = set(list(record.keys()))
-                column_keys = set(series_columns)
+                set(record.keys())
+                set(series_columns)
 
 
                 if len(record) == len(series_columns):
                     return (series_name, list(record.items()))
-                else:
-                    True
-                    #print(self.device_key, series_name, "specified", series_name + "." + column_name, "=", value, "missing:", column_keys-record_keys)
 
         return None
 
 class MonitoringPlug(MonitoredDevice):
-    sensors = {
+    sensors: ClassVar[dict] = {
         ("sensor", "power", "state"): (
             ChangeFilter(),
             ("electricity", "power")
@@ -90,7 +87,7 @@ class MonitoringPlug(MonitoredDevice):
             ("electricity", "energy")
         ),
         ("switch", "switch", "state"): (
-            ChangeFilter(lambda x: True if x == "ON" else False),
+            ChangeFilter(lambda x: x == "ON"),
             ("electricity", "switch")
         ),
 
@@ -101,13 +98,13 @@ class MonitoringPlug(MonitoredDevice):
     }
 
 class MultiPresenceDetector(MonitoredDevice):
-    sensors = {
+    sensors: ClassVar[dict] = {
         ("sensor", "uptime_sensor", "state"): (
             ChangeFilter(int),
             ("iot_device_uptime", "uptime")
         ),
         ("binary_sensor", "presence", "state"): (
-            ChangeFilter(lambda x: True if x == "ON" else False),
+            ChangeFilter(lambda x: x == "ON"),
             ("multi-presence", "occupancy")
         ),
         ("sensor", "presence_target_count", "state"): (
@@ -127,6 +124,10 @@ class MultiPresenceDetector(MonitoredDevice):
     def __init__(self, device_key):
         super().__init__(device_key)
 
+        # Per-instance copy - MultiPresenceDetector.sensors is a shared class-level
+        # default; mutating it directly would leak target sensors across instances.
+        self.sensors = dict(MultiPresenceDetector.sensors)
+
         for target_index in [1, 2, 3]:
             for prop in ["x", "y", "distance", "angle", "speed"]:
                 self.sensors[("sensor", f"target-{target_index}_{prop}", "state")] = (
@@ -135,9 +136,9 @@ class MultiPresenceDetector(MonitoredDevice):
                 )
 
 class PresenceDetector(MonitoredDevice):
-    sensors = {
+    sensors: ClassVar[dict] = {
         ("binary_sensor", "occupancy", "state"): (
-            ChangeFilter(lambda x: True if x == "ON" else False),
+            ChangeFilter(lambda x: x == "ON"),
             ("presence", "occupancy")
         ),
 
@@ -233,7 +234,7 @@ class TradfriBulbHandler:
 
     def cast_payload(self, payload):
         return {
-            "on": True if payload['state'] == 'ON' else False,
+            "on": payload['state'] == 'ON',
             "brightness": payload['brightness'],
             "linkquality": payload['linkquality']
         }

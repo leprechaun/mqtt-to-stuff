@@ -1,19 +1,25 @@
 import argparse
-import sys
-import paho.mqtt.client as mqtt
-import deltalake
-import polars as pl
 import datetime
 import json
-from collections import defaultdict
 import logging
 import os
-import time
+import sys
 import threading
-import code
+import time
+from collections import defaultdict
 
-from devices import ActionButtons, ContactSensor, ThermometerAndHygrometer, TradfriBulbHandler, MotionLuminance, VINDSTYRKA
+import deltalake
+import paho.mqtt.client as mqtt
+import polars as pl
 from delta_client import DeltaLakeClient
+from devices import (
+    VINDSTYRKA,
+    ActionButtons,
+    ContactSensor,
+    MotionLuminance,
+    ThermometerAndHygrometer,
+    TradfriBulbHandler,
+)
 from mqtt_helpers import generate_on_connect
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
@@ -52,9 +58,9 @@ class ZigbeeDeviceRegister:
         try:
             self.dlc.append(df, name, write_options)
             timeseries.clear()
-            self.logger.info("wrote %s records to %s/%s" % (len(df), base_path, name))
+            self.logger.info(f"wrote {len(df)} records to {base_path}/{name}")
 
-        except Exception as e:
+        except Exception as e: #noqa
             self.logger.warning(e)
             self.logger.info("Typically a schema mismatch")
             self.logger.debug(df.schema)
@@ -62,7 +68,7 @@ class ZigbeeDeviceRegister:
 
             csv_path = "/tmp/" + name + "-" + datetime.datetime.now().isoformat() + ".csv"
             df.write_csv(csv_path)
-            self.logger.info("wrote %s records to %s" % (len(df), csv_path))
+            self.logger.info(f"wrote {len(df)} records to {csv_path}")
             self.timeseries[name].clear()
 
 
@@ -71,7 +77,7 @@ class ZigbeeDeviceRegister:
             result = self.try_registering_device(dd)
 
             self.logger.info(
-                "t: '%s', a: '%s', n: '%s', m: '%s' - supported = %s" % (
+                "t: '{}', a: '{}', n: '{}', m: '{}' - supported = {}".format(
                     dd['type'],
                     dd['ieee_address'],
                     dd['friendly_name'],
@@ -97,10 +103,7 @@ class ZigbeeDeviceRegister:
 
         current = pl.DataFrame(for_df)
 
-        try:
-            previous = self.dlc.get("zigbee-devices")
-        except:
-            previous = None
+        previous = self.dlc.get("zigbee-devices")
 
         if previous is None:
             self.dlc.append(current, "zigbee-devices")
@@ -164,7 +167,7 @@ class ZigbeeDeviceRegister:
                 self.logger.debug(["appending", handler.timeseries_name, id])
 
             else:
-                self.logger.info(["not-appending", handler.timeseries_name, "%s didn't match to an id" % friendly_name])
+                self.logger.info(["not-appending", handler.timeseries_name, f"{friendly_name} didn't match to an id"])
         else:
             self.logger.info(["unsuported", friendly_name, payload])
 
@@ -225,7 +228,7 @@ def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")
     parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
-    parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=os.environ.get('INTERVAL', 60))
+    parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=int(os.environ.get('INTERVAL', "60")))
 
     args = parser.parse_args()
 

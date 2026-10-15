@@ -1,9 +1,11 @@
 import datetime
 
+
 class DeviceRegister:
-    type_map = {}
-    devices = {}
-    series = {}
+    def __init__(self):
+        self.type_map = {}
+        self.devices = {}
+        self.series = {}
 
     def add_device_type(self, kind, klass):
         self.type_map[kind] = klass
@@ -21,7 +23,7 @@ class DeviceRegister:
                     series.append(datetime.datetime.now(), key, record)
                     return
                 else:
-                    raise Exception("Undefined series: %s" % series_name)
+                    raise KeyError(f"Undefined series: {series_name}")
             else:
                 #print("series_and_record falsy", series_and_record)
                 pass
@@ -42,14 +44,9 @@ class DeviceRegister:
 
         return None
 
-    def get_records_by_type(self):
-        records = self.records_by_type
-        self.records_by_type = defaultdict(list)
-        return records
-
 
 class Series:
-    def __init__(self, name, throttle : int | float | None = None):
+    def __init__(self, name, throttle : float | None = None):
         self.name = name
         self.records = []
         self.last_updates_by_source = {}
@@ -66,9 +63,8 @@ class Series:
 
         last_update = self.last_updates_by_source.get(source, 0)
 
-        if self.throttle is not None and last_update > 0:
-            if timestamp.timestamp() < (last_update + self.throttle):
-                throttled = True
+        if self.throttle is not None and last_update > 0 and timestamp.timestamp() < (last_update + self.throttle):
+            throttled = True
 
         if not throttled:
             self.records.append(thing)
@@ -76,7 +72,7 @@ class Series:
 
 
     def to_list(self):
-        return [ dict(**{"timestamp": r[0][1]}, **dict(r[1]), **dict(r[2])) for r in self.records ]
+        return [ dict(timestamp=r[0][1], **dict(r[1]), **dict(r[2])) for r in self.records ]
 
     def clear(self):
         self.records.clear()

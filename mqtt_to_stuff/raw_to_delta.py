@@ -1,15 +1,14 @@
 import argparse
-import sys
 import datetime
 import logging
 import os
 import signal
-import time
+import sys
 import threading
+import time
 
 import paho.mqtt.client as mqtt
 import polars as pl
-
 from delta_client import DeltaLakeClient
 from mqtt_helpers import generate_on_connect
 
@@ -62,7 +61,7 @@ def main(args):
     parser = argparse.ArgumentParser(description="Archive all MQTT messages to Delta Lake.")
     parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
-    parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=os.environ.get('INTERVAL', 60))
+    parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=int(os.environ.get('INTERVAL', "60")))
     parser.add_argument("--ignore", dest="ignored_topics", action="append", default=[], metavar="TOPIC", help="Topic filter to ignore (repeatable, supports MQTT wildcards)")
 
     args = parser.parse_args()

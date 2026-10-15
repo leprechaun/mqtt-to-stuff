@@ -1,6 +1,7 @@
 import pytest
 
 from mqtt_to_stuff.devices import (
+    VINDSTYRKA,
     ActionButtons,
     ChangeFilter,
     ContactSensor,
@@ -10,7 +11,6 @@ from mqtt_to_stuff.devices import (
     RainSensor,
     ThermometerAndHygrometer,
     TradfriBulbHandler,
-    VINDSTYRKA,
 )
 
 PLUG_ELECTRICITY_KEYS = [
@@ -50,7 +50,7 @@ class TestChangeFilter:
         assert cf.set("2.0") == 2.0
 
     def test_custom_cast(self):
-        cf = ChangeFilter(lambda x: True if x == "ON" else False)
+        cf = ChangeFilter(lambda x: x == "ON")
         assert cf.set("ON") is True
         assert cf.set("ON") is None
         assert cf.set("OFF") is False
@@ -85,7 +85,7 @@ class TestMonitoredDeviceSet:
         result = device.set(("sensor", "power", "state"), "2")
 
         assert result is not None
-        series_name, record = result
+        _series_name, record = result
         assert dict(record)["power"] == 2.0
 
     def test_resetting_same_value_after_series_complete_returns_none(self):

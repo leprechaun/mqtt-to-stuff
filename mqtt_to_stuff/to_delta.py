@@ -1,21 +1,17 @@
 import argparse
 import logging
-import sys
-import paho.mqtt.client as mqtt
-import polars as pl
 import os
+import signal
+import sys
 import threading
 import time
-import signal
-import datetime
 
-from typing import Dict, Tuple
-from collections.abc import Callable
-
-from devices import MonitoringPlug, PresenceDetector, MultiPresenceDetector
-from register import DeviceRegister, Series
-from mqtt_helpers import generate_on_connect
+import paho.mqtt.client as mqtt
+import polars as pl
 from delta_client import DeltaLakeClient
+from devices import MonitoringPlug, MultiPresenceDetector, PresenceDetector
+from mqtt_helpers import generate_on_connect
+from register import DeviceRegister, Series
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,7 +41,7 @@ def main(args):
     parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
     parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
-    parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=os.environ.get('INTERVAL', 300))
+    parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=int(os.environ.get('INTERVAL', "300")))
 
     args = parser.parse_args()
 

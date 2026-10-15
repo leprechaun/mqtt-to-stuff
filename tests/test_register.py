@@ -14,21 +14,6 @@ class FakeDevice:
         return self.next_result
 
 
-@pytest.fixture(autouse=True)
-def _reset_device_register_class_state():
-    # DeviceRegister.type_map/devices/series are class attributes, not set in
-    # __init__, so every instance shares the same dicts (see item #1 from the
-    # review - accepted as a known risk, not fixed). Reset between tests so
-    # individual tests don't bleed state into each other.
-    DeviceRegister.type_map = {}
-    DeviceRegister.devices = {}
-    DeviceRegister.series = {}
-    yield
-    DeviceRegister.type_map = {}
-    DeviceRegister.devices = {}
-    DeviceRegister.series = {}
-
-
 def test_series_append_without_throttle_always_appends():
     series = Series("test")
     t1 = datetime.datetime(2026, 1, 1, 12, 0, 0)
@@ -127,11 +112,10 @@ def test_device_register_append_data_raises_for_undefined_series():
     device = register.get_or_create("plug", "key-1")
     device.next_result = ("does-not-exist", [("power", 1.0)])
 
-    with pytest.raises(Exception):
+    with pytest.raises(KeyError):
         register.append_data("plug", "key-1", ("power", "state"), "1")
 
 
-@pytest.mark.xfail(reason="type_map/devices/series are class attributes shared across all DeviceRegister instances")
 def test_device_register_instances_do_not_share_state():
     a = DeviceRegister()
     b = DeviceRegister()
@@ -139,11 +123,3 @@ def test_device_register_instances_do_not_share_state():
     a.add_device_type("plug", FakeDevice)
 
     assert b.type_map == {}
-
-
-def test_get_records_by_type_is_broken():
-    # Dead code: references self.records_by_type (never set) and an
-    # unimported defaultdict. Documents that it's unusable as-is.
-    register = DeviceRegister()
-    with pytest.raises(AttributeError):
-        register.get_records_by_type()

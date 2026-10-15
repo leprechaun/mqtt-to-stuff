@@ -39,7 +39,7 @@ spec:
             - secretRef:
                 name: {{ include "mqtt-to-stuff.fullname" . }}
           command:
-            - poetry
+            - uv
             - run
             - python
             - mqtt_to_stuff/zigbee_to_delta.py
@@ -55,7 +55,7 @@ spec:
             - secretRef:
                 name: {{ include "mqtt-to-stuff.fullname" . }}
           command:
-            - poetry
+            - uv
             - run
             - python
             - mqtt_to_stuff/raw_to_delta.py
@@ -72,7 +72,7 @@ spec:
             - secretRef:
                 name: {{ include "mqtt-to-stuff.fullname" . }}
           command:
-            - poetry
+            - uv
             - run
             - python
             - mqtt_to_stuff/to_delta.py

@@ -1,14 +1,14 @@
 FROM python:3.13-slim
 
-RUN pip install poetry
+RUN pip install --no-cache-dir uv
 RUN mkdir /app/
 WORKDIR /app/
 RUN cd /app/
 ADD pyproject.toml /app/
-ADD poetry.lock /app/
+ADD uv.lock /app/
 
-RUN poetry install --without dev --no-root
+RUN uv sync --locked --no-dev --no-install-project
 
-ENTRYPOINT ["poetry", "run", "python"]
+ENTRYPOINT ["uv", "run", "python"]
 
 ADD ./ /app/

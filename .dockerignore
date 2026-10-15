@@ -9,3 +9,4 @@ explore.py
 tests
 *.pyc
 helmchart/
+.venv

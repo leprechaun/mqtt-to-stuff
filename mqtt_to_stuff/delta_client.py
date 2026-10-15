@@ -5,9 +5,10 @@ import polars as pl
 
 
 class DeltaLakeClient:
-    def __init__(self, base_path, storage_options):
+    def __init__(self, base_path, storage_options, compact_at=60):
         self._base_path = base_path
         self._storage_options = storage_options
+        self._compact_at = compact_at
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def get(self, path):
@@ -34,7 +35,7 @@ class DeltaLakeClient:
         self.logger.info("Wrote %s records to %s", len(df), self._base_path + path)
 
         dt = deltalake.DeltaTable(self._base_path + path, storage_options=self._storage_options)
-        if len(dt.file_uris()) >= 60:
+        if len(dt.file_uris()) >= self._compact_at:
             dt.optimize.compact()
             dt.create_checkpoint()
             self.logger.info("Compacted %s", path)

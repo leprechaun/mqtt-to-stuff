@@ -1,7 +1,6 @@
 import argparse
 import sys
 import paho.mqtt.client as mqtt
-import deltalake
 import polars as pl
 import os
 import threading
@@ -15,20 +14,9 @@ from collections.abc import Callable
 from devices import MonitoringPlug, PresenceDetector, MultiPresenceDetector
 from register import DeviceRegister, Series
 from mqtt_helpers import generate_on_connect
+from delta_client import DeltaLakeClient
 
-def write(register, base_path):
-    write_options = {
-        "writer_properties": deltalake.WriterProperties(compression="zstd"),
-        "partition_by":['date']
-    }
-
-    if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
-        options = {
-            "endpoint_url": S3_ENDPOINT
-        }
-    else:
-        options = {}
-
+def write(register, dlc):
     for series_name in register.series:
         series = register.series[series_name]
         df = pl.DataFrame(series.to_list())
@@ -36,29 +24,16 @@ def write(register, base_path):
         if df.shape[0] > 0:
             print(df)
 
-            delta_path = base_path + series_name
-            df.with_columns(
-                pl.col("timestamp").dt.date().alias("date")
-            ).write_delta(
-                delta_path,
-                mode="append",
-                delta_write_options=write_options,
-                storage_options=options
-            )
+            df = df.with_columns(pl.col("timestamp").dt.date().alias("date"))
+            dlc.append(df, series_name, {"partition_by": ["date"]})
 
             series.clear()
 
-            dt = deltalake.DeltaTable(delta_path,storage_options=options)
 
-            if len(dt.file_uris()) >= 24:
-                dt.optimize.compact()
-                dt.create_checkpoint()
-
-
-def periodic_batch_writer(register, base_path, interval):
+def periodic_batch_writer(register, dlc, interval):
     while True:
         time.sleep(interval)
-        write(register, base_path)
+        write(register, dlc)
 
 
 def main(args):
@@ -93,6 +68,15 @@ def main(args):
     for s in series:
         register.add_series(s)
 
+    if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
+        options = {
+            "endpoint_url": S3_ENDPOINT
+        }
+    else:
+        options = {}
+
+    dlc = DeltaLakeClient(args.delta_path, options, compact_at=24)
+
     def on_message(client, userdata, msg):
         try:
             payload = msg.payload.decode("utf-8")
@@ -108,8 +92,8 @@ def main(args):
 
     # Start periodic batch writer thread
     batch_thread = threading.Thread(
-        target=periodic_batch_writer, 
-        args=(register, args.delta_path, args.interval), 
+        target=periodic_batch_writer,
+        args=(register, dlc, args.interval),
         daemon=True
     )
     batch_thread.start()
@@ -120,7 +104,7 @@ def main(args):
 
 
     def sigterm_handler(SIGNAL, STACK_FRAME):
-        write(register, args.delta_path)
+        write(register, dlc)
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, sigterm_handler)

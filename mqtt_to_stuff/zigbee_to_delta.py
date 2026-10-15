@@ -14,6 +14,7 @@ import code
 
 from devices import ActionButtons, ContactSensor, ThermometerAndHygrometer, TradfriBulbHandler, MotionLuminance, VINDSTYRKA
 from delta_client import DeltaLakeClient
+from mqtt_helpers import generate_on_connect
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
 
@@ -220,13 +221,6 @@ def periodic_batch_writer(register, base_path, interval):
         time.sleep(interval)
         register.write_all_and_clear(base_path)
 
-
-def generate_on_connect(topics):
-    def on_connect(client, userdata, flags, reason_code, properties):
-        for topic in topics:
-            client.subscribe(topic)
-
-    return on_connect
 
 def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")

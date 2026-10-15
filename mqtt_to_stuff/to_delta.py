@@ -14,13 +14,7 @@ from collections.abc import Callable
 
 from devices import MonitoringPlug, PresenceDetector, MultiPresenceDetector
 from register import DeviceRegister, Series
-
-def generate_on_connect(topics):
-    def on_connect(client, userdata, flags, reason_code, properties):
-        for topic in topics:
-            client.subscribe(topic)
-
-    return on_connect
+from mqtt_helpers import generate_on_connect
 
 def write(register, base_path):
     write_options = {

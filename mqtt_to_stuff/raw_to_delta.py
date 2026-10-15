@@ -11,6 +11,7 @@ import paho.mqtt.client as mqtt
 import polars as pl
 
 from delta_client import DeltaLakeClient
+from mqtt_helpers import generate_on_connect
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,15 +56,6 @@ def flush_buffer(dlc, interval):
     while True:
         time.sleep(interval)
         do_flush(dlc)
-
-
-def generate_on_connect(topics):
-    def on_connect(client, userdata, flags, reason_code, properties):
-        for topic in topics:
-            client.subscribe(topic)
-        logger.info("Connected, subscribed to %s", topics)
-
-    return on_connect
 
 
 def main(args):

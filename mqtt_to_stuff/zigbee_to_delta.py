@@ -3,7 +3,6 @@ import datetime
 import json
 import logging
 import os
-import sys
 import threading
 import time
 from collections import defaultdict
@@ -12,6 +11,7 @@ import deltalake
 import paho.mqtt.client as mqtt
 import polars as pl
 
+from .cli_args import add_common_arguments
 from .delta_client import DeltaLakeClient
 from .devices import (
     VINDSTYRKA,
@@ -233,9 +233,7 @@ def periodic_batch_writer(register, base_path, interval):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")
-    parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
-    parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
-    parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=int(os.environ.get('INTERVAL', "60")))
+    add_common_arguments(parser)
 
     return parser.parse_args(argv)
 
@@ -278,9 +276,3 @@ def main(args):
     mqttc.loop_forever()
 
     return 0
-
-def cli():
-    sys.exit(main(sys.argv[1:]))
-
-if __name__ == "__main__":
-    cli()

@@ -15,9 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-zigbee-to-deltalake = "mqtt_to_stuff.zigbee_to_delta:cli"
-raw-mqtt-to-delta = "mqtt_to_stuff.raw_to_delta:cli"
-hierarchy-to-deltalake = "mqtt_to_stuff.to_delta:cli"
+mqtt-to-stuff = "mqtt_to_stuff.cli:cli"
 
 [build-system]
 requires = ["hatchling"]

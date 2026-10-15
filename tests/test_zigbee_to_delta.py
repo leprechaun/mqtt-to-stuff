@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 
 from mqtt_to_stuff.devices import ThermometerAndHygrometer, TradfriBulbHandler
-from mqtt_to_stuff.zigbee_to_delta import ZigbeeDeviceRegister, on_message
+from mqtt_to_stuff.zigbee_to_delta import ZigbeeDeviceRegister, on_message, parse_args
 
 DEVICE_DEFINITION = {
     "type": "EndDevice",
@@ -162,6 +162,11 @@ def test_write_timeseries_falls_back_to_csv_on_schema_mismatch():
     finally:
         for f in csv_files:
             os.remove(f)
+
+
+def test_parse_args_interval_default(monkeypatch):
+    monkeypatch.delenv("INTERVAL", raising=False)
+    assert parse_args([]).interval == 300
 
 
 class FakeZDR:

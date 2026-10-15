@@ -74,6 +74,11 @@ def test_do_flush_writes_and_clears_buffer():
     assert raw_to_delta.buffer == []
 
 
+def test_parse_args_interval_default(monkeypatch):
+    monkeypatch.delenv("INTERVAL", raising=False)
+    assert raw_to_delta.parse_args([]).interval == 300
+
+
 def test_do_flush_swallows_append_errors():
     raw_to_delta.buffer.append({
         "topic": "t",

@@ -9,10 +9,25 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
-    permissions:
-      contents: read
-      packages: write
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: pip install --no-cache-dir uv
+
+      - name: Run tests
+        run: |
+          uv sync --locked --all-groups
+          uv run pytest
+
+  lint-chart:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -23,6 +38,18 @@ jobs:
       - name: Lint
         run: |
           helm lint ./helm-charts/mqtt-to-stuff/
+
+
+  build:
+    needs:
+      - test
+      - lint-chart
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
 
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1

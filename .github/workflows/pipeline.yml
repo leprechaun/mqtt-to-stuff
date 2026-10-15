@@ -1,8 +1,6 @@
 name: pipeline
 on:
   push:
-    branches:
-      - master
 
 env:
   REGISTRY: ghcr.io
@@ -59,6 +57,7 @@ jobs:
 
 
   build:
+    if: github.ref == 'refs/heads/master'
     needs:
       - test
       - lint

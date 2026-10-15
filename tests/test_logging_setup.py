@@ -43,6 +43,50 @@ def test_json_format_includes_exception(monkeypatch, capsys):
     assert "ValueError: boom" in payload["exception"]
 
 
+def test_json_format_merges_extra_fields(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    configure_logging()
+
+    logging.getLogger("test").info("usage event", extra={"key_id": "abc", "model": "haiku"})
+
+    out = capsys.readouterr().out.strip()
+    payload = json.loads(out)
+
+    assert payload == {
+        "level": "INFO",
+        "logger": "test",
+        "message": "usage event",
+        "key_id": "abc",
+        "model": "haiku",
+    }
+
+
+def test_json_format_extra_with_non_json_native_value(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    configure_logging()
+
+    import datetime
+    logging.getLogger("test").info("event", extra={"when": datetime.datetime(2026, 1, 1)})
+
+    out = capsys.readouterr().out.strip()
+    payload = json.loads(out)  # should not raise
+
+    assert payload["when"] == "2026-01-01 00:00:00"
+
+
+def test_json_format_extra_cannot_clobber_reserved_keys(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    configure_logging()
+
+    logging.getLogger("test").info("hello", extra={"level": "HACKED", "logger": "HACKED"})
+
+    out = capsys.readouterr().out.strip()
+    payload = json.loads(out)
+
+    assert payload["level"] == "INFO"
+    assert payload["logger"] == "test"
+
+
 def test_plain_text_format_when_log_format_unset(monkeypatch, capsys):
     monkeypatch.delenv("LOG_FORMAT", raising=False)
     configure_logging()

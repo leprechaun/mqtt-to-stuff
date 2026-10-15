@@ -2,7 +2,7 @@ import argparse
 import datetime
 import json
 import logging
-import os
+import signal
 import threading
 import time
 from collections import defaultdict
@@ -22,6 +22,7 @@ from .devices import (
     TradfriBulbHandler,
 )
 from .mqtt_helpers import generate_on_connect
+from .storage_options import build_storage_options
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +49,6 @@ class ZigbeeDeviceRegister:
             "writer_properties": deltalake.WriterProperties(compression="zstd"),
             "partition_by":['date']
         }
-
-        options = {}
-        if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
-            options["endpoint_url"] = S3_ENDPOINT
 
         df = pl.DataFrame(timeseries).with_columns(date=pl.col('timestamp').dt.date())
 
@@ -248,11 +245,7 @@ def main(args):
     )
     batch_thread.start()
 
-    options = {}
-    if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
-        options["endpoint_url"] = S3_ENDPOINT
-
-    options["AWS_SESSION_TOKEN"] = os.environ.get('AWS_SESSION_TOKEN', "")
+    options = build_storage_options(include_session_token=True)
 
     logger.info("%s", options)
 
@@ -260,18 +253,25 @@ def main(args):
 
     ZDR.set_deltalakeclient(dlc)
 
-
-
     topics = ["zigbee2mqtt/#"]
 
-    #mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc.on_connect = generate_on_connect(topics)
     mqttc.on_message = on_message
     mqttc.user_data_set(ZDR)
 
+    def handle_shutdown(signum, frame):
+        logger.info("Received signal %d, shutting down", signum)
+        mqttc.disconnect()
+
+    signal.signal(signal.SIGTERM, handle_shutdown)
+    signal.signal(signal.SIGINT, handle_shutdown)
+
     mqttc.connect(args.host, 1883, 60)
 
     mqttc.loop_forever()
+
+    logger.info("Flushing remaining messages before exit")
+    ZDR.write_all_and_clear(args.delta_path)
 
     return 0

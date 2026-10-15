@@ -1,7 +1,6 @@
 import argparse
 import datetime
 import logging
-import os
 import signal
 import threading
 import time
@@ -12,6 +11,7 @@ import polars as pl
 from .cli_args import add_common_arguments
 from .delta_client import DeltaLakeClient
 from .mqtt_helpers import generate_on_connect
+from .storage_options import build_storage_options
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +68,7 @@ def parse_args(argv=None):
 def main(args):
     args = parse_args(args)
 
-    options = {}
-    if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
-        options["endpoint_url"] = S3_ENDPOINT
-    options["AWS_SESSION_TOKEN"] = os.environ.get('AWS_SESSION_TOKEN', "")
+    options = build_storage_options(include_session_token=True)
 
     dlc = DeltaLakeClient(args.delta_path, options)
 

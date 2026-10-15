@@ -3,6 +3,10 @@ import logging
 import os
 import sys
 
+_RESERVED_RECORD_ATTRS = frozenset(
+    logging.LogRecord(name="", level=0, pathname="", lineno=0, msg="", args=(), exc_info=None).__dict__.keys()
+) | {"message", "asctime"}
+
 
 class JsonFormatter(logging.Formatter):
     def format(self, record):
@@ -12,10 +16,14 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
+        for key, value in record.__dict__.items():
+            if key not in _RESERVED_RECORD_ATTRS and key not in payload:
+                payload[key] = value
+
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
 
-        return json.dumps(payload)
+        return json.dumps(payload, default=str)
 
 
 def configure_logging():

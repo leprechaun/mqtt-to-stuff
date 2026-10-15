@@ -14,6 +14,7 @@ from .delta_client import DeltaLakeClient
 from .devices import MonitoringPlug, MultiPresenceDetector, PresenceDetector
 from .mqtt_helpers import generate_on_connect
 from .register import DeviceRegister, Series
+from .storage_options import build_storage_options
 
 logger = logging.getLogger(__name__)
 
@@ -89,12 +90,7 @@ def main(args):
     for s in series:
         register.add_series(s)
 
-    if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
-        options = {
-            "endpoint_url": S3_ENDPOINT
-        }
-    else:
-        options = {}
+    options = build_storage_options(include_session_token=False)
 
     dlc = DeltaLakeClient(args.delta_path, options, compact_at=24)
 

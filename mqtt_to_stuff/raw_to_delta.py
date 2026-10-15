@@ -8,42 +8,15 @@ import time
 import threading
 
 import paho.mqtt.client as mqtt
-import deltalake
 import polars as pl
+
+from delta_client import DeltaLakeClient
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 buffer = []
 buffer_lock = threading.Lock()
-
-
-class DeltaLakeClient:
-    def __init__(self, base_path, storage_options):
-        self._base_path = base_path
-        self._storage_options = storage_options
-        self._logger = logging.getLogger(self.__class__.__name__)
-
-    def append(self, df, path, write_options=None):
-        if write_options is None:
-            write_options = {}
-
-        write_options["writer_properties"] = deltalake.WriterProperties(compression="zstd")
-
-        df.write_delta(
-            self._base_path + path,
-            delta_write_options=write_options,
-            storage_options=self._storage_options,
-            mode="append",
-        )
-
-        self._logger.info("Wrote %s records to %s", len(df), self._base_path + path)
-
-        dt = deltalake.DeltaTable(self._base_path + path, storage_options=self._storage_options)
-        if len(dt.file_uris()) >= 60:
-            dt.optimize.compact()
-            dt.create_checkpoint()
-            self._logger.info("Compacted %s", path)
 
 
 def on_message(client, userdata, msg):

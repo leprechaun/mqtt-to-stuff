@@ -13,6 +13,7 @@ import threading
 import code
 
 from devices import ActionButtons, ContactSensor, ThermometerAndHygrometer, TradfriBulbHandler, MotionLuminance, VINDSTYRKA
+from delta_client import DeltaLakeClient
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
 
@@ -186,47 +187,6 @@ ZDR.add_handler(motion_sensors)
 
 vindstyrka = VINDSTYRKA()
 ZDR.add_handler(vindstyrka)
-
-
-class DeltaLakeClient:
-    def __init__(self, base_path, storage_options):
-        self._base_path = base_path
-        self._storage_options = storage_options
-        self.logger = logging.getLogger(self.__class__.__name__)
-
-    def get(self, path):
-        p = self._base_path + path
-        print("going to read", p)
-        return pl.read_delta(
-            p,
-            storage_options = self._storage_options
-        )
-
-    # self.dlc.write(df, name, write_options)
-    def append(self, df, path, write_options = None):
-        if write_options is None:
-            write_options = {}
-
-        write_options.update({
-            "writer_properties": deltalake.WriterProperties(compression="zstd"),
-        })
-
-        df.write_delta(
-            self._base_path + path,
-            delta_write_options = write_options,
-            storage_options = self._storage_options,
-            mode = "append"
-        )
-
-        dt = deltalake.DeltaTable(
-            self._base_path + path,
-            storage_options = self._storage_options
-        )
-
-        if len(dt.file_uris()) >= 60:
-            dt.optimize.compact()
-            dt.create_checkpoint()
-            self.logger.info("Compacting")
 
 
 def on_message(client, userdata, msg):

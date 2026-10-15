@@ -104,12 +104,16 @@ class ZigbeeDeviceRegister:
 
         current = pl.DataFrame(for_df)
 
-        previous = self.dlc.get("zigbee-devices")
+        try:
+            previous = self.dlc.get("zigbee-devices")
+        except FileNotFoundError:
+            previous = None
 
         if previous is None:
             self.dlc.append(current, "zigbee-devices")
             self.logger.info("had nothing - write all of current")
             self.logger.info("%s", current)
+            return
 
         latest = previous.sort(by=['timestamp']).group_by(["address"], maintain_order=True).last()
         anti = current.join(latest, on=['address','friendly_name'], how='anti')

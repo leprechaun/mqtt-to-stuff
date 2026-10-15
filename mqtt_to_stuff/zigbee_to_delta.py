@@ -11,8 +11,9 @@ from collections import defaultdict
 import deltalake
 import paho.mqtt.client as mqtt
 import polars as pl
-from delta_client import DeltaLakeClient
-from devices import (
+
+from .delta_client import DeltaLakeClient
+from .devices import (
     VINDSTYRKA,
     ActionButtons,
     ContactSensor,
@@ -20,7 +21,7 @@ from devices import (
     ThermometerAndHygrometer,
     TradfriBulbHandler,
 )
-from mqtt_helpers import generate_on_connect
+from .mqtt_helpers import generate_on_connect
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -194,9 +195,11 @@ ZDR.add_handler(vindstyrka)
 
 
 def on_message(client, userdata, msg):
+    zdr = userdata
+
     if msg.topic.startswith('zigbee2mqtt/bridge/devices'):
         o = json.loads(msg.payload.decode('utf-8'))
-        ZDR.register_devices(o)
+        zdr.register_devices(o)
 
     elif msg.topic.startswith("zigbee2mqtt/bridge"):
         return
@@ -213,7 +216,7 @@ def on_message(client, userdata, msg):
         try:
             if len(split) == 2:
                 o = json.loads(msg.payload.decode('utf-8'))
-                ZDR.append(maybe_friendly_name, o)
+                zdr.append(maybe_friendly_name, o)
 
         except json.decoder.JSONDecodeError:
             logger.exception("failed to parse %s: %s", msg.topic, msg.payload.decode("utf-8"))
@@ -224,13 +227,17 @@ def periodic_batch_writer(register, base_path, interval):
         register.write_all_and_clear(base_path)
 
 
-def main(args):
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")
     parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
     parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=int(os.environ.get('INTERVAL', "60")))
 
-    args = parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def main(args):
+    args = parse_args(args)
 
     # Start periodic batch writer thread
     batch_thread = threading.Thread(
@@ -260,6 +267,7 @@ def main(args):
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc.on_connect = generate_on_connect(topics)
     mqttc.on_message = on_message
+    mqttc.user_data_set(ZDR)
 
     mqttc.connect(args.host, 1883, 60)
 
@@ -267,5 +275,8 @@ def main(args):
 
     return 0
 
-if __name__ == "__main__":
+def cli():
     sys.exit(main(sys.argv[1:]))
+
+if __name__ == "__main__":
+    cli()

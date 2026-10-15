@@ -8,10 +8,11 @@ import time
 
 import paho.mqtt.client as mqtt
 import polars as pl
-from delta_client import DeltaLakeClient
-from devices import MonitoringPlug, MultiPresenceDetector, PresenceDetector
-from mqtt_helpers import generate_on_connect
-from register import DeviceRegister, Series
+
+from .delta_client import DeltaLakeClient
+from .devices import MonitoringPlug, MultiPresenceDetector, PresenceDetector
+from .mqtt_helpers import generate_on_connect
+from .register import DeviceRegister, Series
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,17 +37,36 @@ def periodic_batch_writer(register, dlc, interval):
         write(register, dlc)
 
 
-def main(args):
+def on_message(client, userdata, msg):
+    register = userdata
+    try:
+        payload = msg.payload.decode("utf-8")
+        _, zone, area, kind, thing, *rest = msg.topic.split("/")
+        key = (("zone", zone), ("area", area), ("thing", thing))
+        register.append_data(kind, key, tuple(rest), payload)
+
+    except ValueError:
+        logger.exception("exception: %s", msg.topic)
+        return
+
+
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Copy MQTT events to DeltaLake.")
     parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
     parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
     parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=int(os.environ.get('INTERVAL', "300")))
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if not args.topics and (env_topic := os.environ.get('MQTT_TOPIC')):
         args.topics = [env_topic]
+
+    return args
+
+
+def main(args):
+    args = parse_args(args)
 
     register = DeviceRegister()
     register.add_device_type("plug", MonitoringPlug)
@@ -80,18 +100,6 @@ def main(args):
 
     dlc = DeltaLakeClient(args.delta_path, options, compact_at=24)
 
-    def on_message(client, userdata, msg):
-        try:
-            payload = msg.payload.decode("utf-8")
-            _, zone, area, kind, thing, *rest = msg.topic.split("/")
-            key = (("zone", zone), ("area", area), ("thing", thing))
-            register.append_data(kind, key, tuple(rest), payload)
-
-        except ValueError:
-            logger.exception("exception: %s", msg.topic)
-            return
-
-
     # Start periodic batch writer thread
     batch_thread = threading.Thread(
         target=periodic_batch_writer,
@@ -103,6 +111,7 @@ def main(args):
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc.on_connect = generate_on_connect(args.topics)
     mqttc.on_message = on_message
+    mqttc.user_data_set(register)
 
 
     def sigterm_handler(SIGNAL, STACK_FRAME):
@@ -118,5 +127,8 @@ def main(args):
 
     return 0
 
-if __name__ == "__main__":
+def cli():
     sys.exit(main(sys.argv[1:]))
+
+if __name__ == "__main__":
+    cli()

@@ -9,8 +9,10 @@ ADD uv.lock /app/
 
 RUN uv sync --locked --no-dev --no-install-project
 
+ADD ./ /app/
+
+RUN uv sync --locked --no-dev
+
 ENV UV_NO_SYNC=1
 
-ENTRYPOINT ["uv", "run", "python"]
-
-ADD ./ /app/
+ENTRYPOINT ["uv", "run"]

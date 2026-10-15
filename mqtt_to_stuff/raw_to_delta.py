@@ -9,8 +9,9 @@ import time
 
 import paho.mqtt.client as mqtt
 import polars as pl
-from delta_client import DeltaLakeClient
-from mqtt_helpers import generate_on_connect
+
+from .delta_client import DeltaLakeClient
+from .mqtt_helpers import generate_on_connect
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,14 +58,18 @@ def flush_buffer(dlc, interval):
         do_flush(dlc)
 
 
-def main(args):
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Archive all MQTT messages to Delta Lake.")
     parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
     parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=int(os.environ.get('INTERVAL', "60")))
     parser.add_argument("--ignore", dest="ignored_topics", action="append", default=[], metavar="TOPIC", help="Topic filter to ignore (repeatable, supports MQTT wildcards)")
 
-    args = parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def main(args):
+    args = parse_args(args)
 
     options = {}
     if S3_ENDPOINT := os.environ.get('AWS_ENDPOINT_URL_S3'):
@@ -97,5 +102,9 @@ def main(args):
     return 0
 
 
-if __name__ == "__main__":
+def cli():
     sys.exit(main(sys.argv[1:]))
+
+
+if __name__ == "__main__":
+    cli()

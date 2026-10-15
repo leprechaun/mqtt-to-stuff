@@ -13,6 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Helm tool installer
+        uses: Azure/setup-helm@v5
+
+      - name: Lint
+        run: |
+          helm lint ./helm-charts/mqtt-to-stuff/
+
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
@@ -29,3 +37,26 @@ jobs:
           echo docker tag "${IMAGE}:latest" "${IMAGE}:0.1.${{ github.run_number }}"
           docker tag "${IMAGE}:latest" "${IMAGE}:0.1.${{ github.run_number }}"
           docker push "${IMAGE}:0.1.${{ github.run_number }}"
+
+      - name: Package
+        run: |
+          helm package --version 0.1.${{ github.run_number }} ./helm-charts/mqtt-to-stuff/
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: chart
+          path: mqtt-to-stuff-0.1.${{ github.run_number }}.tgz
+
+      - name: Push Chart Artifact
+        uses: dmnemec/copy_file_to_another_repo_action@bbebd3da22e4a37d04dca5f782edd5201cb97083
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source_file: mqtt-to-stuff-0.1.${{ github.run_number }}.tgz
+          destination_repo: 'leprechaun/leprechaun.github.io'
+          destination_folder: 'mqtt-to-stuff'
+          destination_branch: master
+          user_email: 'leprechaun-automation@github.com'
+          user_name: 'leprechaun-automation'
+          commit_message: mqtt-to-stuff-0.1.${{ github.run_number }}.tgz

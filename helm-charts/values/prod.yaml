@@ -1,0 +1,23 @@
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+config:
+  env:
+    MQTT_HOST: mqtt.k8s.fscker.org
+    MQTT_TOPIC: 'devices/#'
+    INTERVAL: "900"
+    DELTA_PATH: s3://deltalake/home-automation/raw/
+    AWS_ENDPOINT_URL_S3: https://minio.k8s.fscker.org
+    PYTHONUNBUFFERED: "yes"
+  secrets:
+    AWS_SECRET_ACCESS_KEY: vfpG5OMYNeeaqxRWjjXanbSWLdaCQfXW2UqZMcgi
+    AWS_ACCESS_KEY_ID: sBacmnLgm3SuMZ9TDMFu

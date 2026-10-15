@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mqtt-to-stuff.fullname" . }}
+  labels:
+    {{- include "mqtt-to-stuff.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "mqtt-to-stuff.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "mqtt-to-stuff.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mqtt-to-stuff.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-zigbee-to-deltalake
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "mqtt-to-stuff.fullname" . }}
+            - secretRef:
+                name: {{ include "mqtt-to-stuff.fullname" . }}
+          command:
+            - poetry
+            - run
+            - python
+            - mqtt_to_stuff/zigbee_to_delta.py
+
+        - name: {{ .Chart.Name }}-raw-mqtt-to-delta
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "mqtt-to-stuff.fullname" . }}
+            - secretRef:
+                name: {{ include "mqtt-to-stuff.fullname" . }}
+          command:
+            - poetry
+            - run
+            - python
+            - mqtt_to_stuff/raw_to_delta.py
+
+
+        - name: {{ .Chart.Name }}-hierarchy-to-deltalake
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "mqtt-to-stuff.fullname" . }}
+            - secretRef:
+                name: {{ include "mqtt-to-stuff.fullname" . }}
+          command:
+            - poetry
+            - run
+            - python
+            - mqtt_to_stuff/to_delta.py
+#         ports:
+#           - name: http
+#             containerPort: .Values.service.port
+#             protocol: TCP
+#         livenessProbe:
+#           httpGet:
+#             path: /
+#             port: http
+#         readinessProbe:
+#           httpGet:
+#             path: /
+#             port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

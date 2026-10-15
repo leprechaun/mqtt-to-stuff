@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 import paho.mqtt.client as mqtt
 import polars as pl
@@ -16,13 +17,16 @@ from register import DeviceRegister, Series
 from mqtt_helpers import generate_on_connect
 from delta_client import DeltaLakeClient
 
+logging.basicConfig(encoding='utf-8', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def write(register, dlc):
     for series_name in register.series:
         series = register.series[series_name]
         df = pl.DataFrame(series.to_list())
 
         if df.shape[0] > 0:
-            print(df)
+            logger.info("%s", df)
 
             df = df.with_columns(pl.col("timestamp").dt.date().alias("date"))
             dlc.append(df, series_name, {"partition_by": ["date"]})
@@ -84,9 +88,8 @@ def main(args):
             key = (("zone", zone), ("area", area), ("thing", thing))
             register.append_data(kind, key, tuple(rest), payload)
 
-        except ValueError as e:
-            print(e)
-            print("exception: " + msg.topic)
+        except ValueError:
+            logger.exception("exception: %s", msg.topic)
             return
 
 

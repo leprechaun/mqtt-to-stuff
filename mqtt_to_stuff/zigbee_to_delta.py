@@ -17,6 +17,7 @@ from delta_client import DeltaLakeClient
 from mqtt_helpers import generate_on_connect
 
 logging.basicConfig(encoding='utf-8', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ZigbeeDeviceRegister:
     def __init__(self):
@@ -33,8 +34,8 @@ class ZigbeeDeviceRegister:
             for name in self.timeseries:
                 if len(self.timeseries[name]) > 0:
                     self._write_timeseries(base_path,name, self.timeseries[name])
-        except Exception as e:
-            print(e)
+        except Exception:
+            self.logger.exception("write_all_and_clear failed")
 
     def _write_timeseries(self, base_path, name, timeseries):
         write_options = {
@@ -57,8 +58,7 @@ class ZigbeeDeviceRegister:
             self.logger.warning(e)
             self.logger.info("Typically a schema mismatch")
             self.logger.debug(df.schema)
-
-            print(df)
+            self.logger.debug("%s", df)
 
             csv_path = "/tmp/" + name + "-" + datetime.datetime.now().isoformat() + ".csv"
             df.write_csv(csv_path)
@@ -104,23 +104,23 @@ class ZigbeeDeviceRegister:
 
         if previous is None:
             self.dlc.append(current, "zigbee-devices")
-            print("had nothing - write all of current")
-            print(current)
+            self.logger.info("had nothing - write all of current")
+            self.logger.info("%s", current)
 
         latest = previous.sort(by=['timestamp']).group_by(["address"], maintain_order=True).last()
         anti = current.join(latest, on=['address','friendly_name'], how='anti')
 
 
-        print("latest")
-        print(latest)
+        self.logger.info("latest")
+        self.logger.info("%s", latest)
 
         if len(anti) > 0:
-            print("anti: should write this")
-            print(anti)
+            self.logger.info("anti: should write this")
+            self.logger.info("%s", anti)
 
             self.dlc.append(anti, 'zigbee-devices')
         else:
-            print("nothing to write")
+            self.logger.info("nothing to write")
 
 
     def try_registering_device(self, device_definition):
@@ -212,9 +212,8 @@ def on_message(client, userdata, msg):
                 o = json.loads(msg.payload.decode('utf-8'))
                 ZDR.append(maybe_friendly_name, o)
 
-        except json.decoder.JSONDecodeError as e:
-            print(["failed-to-parse", msg.topic, msg.payload.decode("utf-8")])
-            print(msg.payload.decode("utf-8"))
+        except json.decoder.JSONDecodeError:
+            logger.exception("failed to parse %s: %s", msg.topic, msg.payload.decode("utf-8"))
 
 def periodic_batch_writer(register, base_path, interval):
     while True:
@@ -244,7 +243,7 @@ def main(args):
 
     options["AWS_SESSION_TOKEN"] = os.environ.get('AWS_SESSION_TOKEN', "")
 
-    print(options)
+    logger.info("%s", options)
 
     dlc = DeltaLakeClient(args.delta_path, options)
 

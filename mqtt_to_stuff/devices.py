@@ -1,5 +1,8 @@
 from collections import defaultdict
 import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ChangeFilter:
     def __init__(self, cast = lambda x: float(x)):
@@ -10,7 +13,7 @@ class ChangeFilter:
         cast = self.cast(value)
 
         if self._previous_value != cast:
-            print("set: return cast value - values different", value, cast, self._previous_value)
+            logger.debug("set: return cast value - values different %s %s %s", value, cast, self._previous_value)
             self._previous_value = cast
             return cast
 

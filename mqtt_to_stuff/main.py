@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 import paho.mqtt.client as mqtt
 from prometheus_client import start_http_server, Summary, Gauge
@@ -8,6 +9,8 @@ import polars
 from typing import Dict, Tuple
 from collections.abc import Callable
 
+logging.basicConfig(encoding='utf-8', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 labels = ['zone', 'area', 'thing']
 
@@ -64,15 +67,15 @@ def handle_esphome(zone, area, kind, thing, rest, payload):
             return
 
 
-    print("ESPHOME", zone, area, kind, thing, rest, payload)
+    logger.warning("ESPHOME %s %s %s %s %s %s", zone, area, kind, thing, rest, payload)
 
 
 def handle_lgtv(zone, area, kind, thing, rest, payload):
-    print("LGTV", zone, area, kind, kind, thing, rest, payload)
+    logger.info("LGTV %s %s %s %s %s %s %s", zone, area, kind, kind, thing, rest, payload)
 
 
 def unsupported(zone, area, kind, thing, rest, payload):
-    print("unsupported: " + kind)
+    logger.warning("unsupported: %s", kind)
 
 
 def on_message(client, userdata, msg):
@@ -82,9 +85,8 @@ def on_message(client, userdata, msg):
     if msg.topic.startswith("devices/"):
         try:
             _, zone, area, kind, thing, *rest = msg.topic.split("/")
-        except ValueError as e:
-            print(e)
-            print("exception: " + msg.topic)
+        except ValueError:
+            logger.exception("exception: %s", msg.topic)
             return
 
         match kind:
@@ -101,7 +103,7 @@ def on_message(client, userdata, msg):
                 unsupported(zone, area, kind, thing, rest, payload)
 
     else:
-        print(msg.topic)
+        logger.info(msg.topic)
 
 
 def generate_on_connect(topics):
@@ -118,7 +120,7 @@ def main(args):
     parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
 
     args = parser.parse_args()
-    print(args)
+    logger.info(args)
 
     #mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)

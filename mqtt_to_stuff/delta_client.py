@@ -13,7 +13,7 @@ class DeltaLakeClient:
 
     def get(self, path):
         p = self._base_path + path
-        print("going to read", p)
+        self.logger.info("going to read %s", p)
         return pl.read_delta(
             p,
             storage_options=self._storage_options

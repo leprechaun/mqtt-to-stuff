@@ -43,11 +43,14 @@ def periodic_batch_writer(register, dlc, interval):
 def main(args):
     parser = argparse.ArgumentParser(description="Copy MQTT events to DeltaLake.")
     parser.add_argument("--host", help="The MQTT host address.", default=os.environ.get('MQTT_HOST'))
-    parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.", default=os.environ.get('MQTT_TOPIC'))
+    parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
     parser.add_argument("-d", "--delta-path", dest="delta_path", help="Base path for DeltaLake tables", default=os.environ.get('DELTA_PATH', '/tmp/deltalake/'))
     parser.add_argument("-i", "--interval", type=int, help="Batch write interval in seconds", default=os.environ.get('INTERVAL', 300))
 
     args = parser.parse_args()
+
+    if not args.topics and (env_topic := os.environ.get('MQTT_TOPIC')):
+        args.topics = [env_topic]
 
     register = DeviceRegister()
     register.add_device_type("plug", MonitoringPlug)

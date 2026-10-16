@@ -1,4 +1,3 @@
-import argparse
 import datetime
 import json
 import logging
@@ -11,7 +10,7 @@ import deltalake
 import paho.mqtt.client as mqtt
 import polars as pl
 
-from .cli_args import add_common_arguments
+from .commands import Command
 from .delta_client import DeltaLakeClient
 from .devices import (
     VINDSTYRKA,
@@ -231,16 +230,11 @@ def periodic_batch_writer(register, interval):
         register.write_all_and_clear()
 
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Copy MQTT events to stdout.")
-    add_common_arguments(parser)
-
-    return parser.parse_args(argv)
+def add_arguments(parser):
+    pass
 
 
-def main(args):
-    args = parse_args(args)
-
+def run(args):
     # Start periodic batch writer thread
     batch_thread = threading.Thread(
         target=periodic_batch_writer,
@@ -279,3 +273,11 @@ def main(args):
     ZDR.write_all_and_clear()
 
     return 0
+
+
+COMMAND = Command(
+    name="zigbee",
+    help="Copy MQTT events to stdout.",
+    add_arguments=add_arguments,
+    run=run,
+)

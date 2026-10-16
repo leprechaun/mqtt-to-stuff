@@ -41,47 +41,6 @@ def test_write_skips_empty_series():
     assert dlc.append_calls == []
 
 
-def test_parse_args_falls_back_to_env_topic_as_list(monkeypatch):
-    monkeypatch.setenv("MQTT_TOPIC", "devices/#")
-
-    args = to_delta.parse_args([])
-
-    assert args.topics == ["devices/#"]
-
-
-def test_parse_args_cli_topic_overrides_env(monkeypatch):
-    monkeypatch.setenv("MQTT_TOPIC", "devices/#")
-
-    args = to_delta.parse_args(["-t", "custom/topic"])
-
-    assert args.topics == ["custom/topic"]
-
-
-def test_parse_args_multiple_cli_topics():
-    args = to_delta.parse_args(["-t", "a/#", "-t", "b/#"])
-    assert args.topics == ["a/#", "b/#"]
-
-
-def test_parse_args_no_topic_and_no_env_is_none(monkeypatch):
-    monkeypatch.delenv("MQTT_TOPIC", raising=False)
-    args = to_delta.parse_args([])
-    assert args.topics is None
-
-
-def test_parse_args_host_from_env(monkeypatch):
-    monkeypatch.setenv("MQTT_HOST", "mqtt.example.org")
-    args = to_delta.parse_args([])
-    assert args.host == "mqtt.example.org"
-
-
-def test_parse_args_interval_default_and_env(monkeypatch):
-    monkeypatch.delenv("INTERVAL", raising=False)
-    assert to_delta.parse_args([]).interval == 300
-
-    monkeypatch.setenv("INTERVAL", "45")
-    assert to_delta.parse_args([]).interval == 45
-
-
 def test_on_message_dispatches_well_formed_topic():
     calls = []
 

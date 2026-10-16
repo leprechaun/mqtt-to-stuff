@@ -1,15 +1,13 @@
-import argparse
 import logging
 import os
 import signal
-import sys
 import threading
 import time
 
 import paho.mqtt.client as mqtt
 import polars as pl
 
-from .cli_args import add_common_arguments
+from .commands import Command
 from .delta_client import DeltaLakeClient
 from .devices import MonitoringPlug, MultiPresenceDetector, PresenceDetector
 from .mqtt_helpers import generate_on_connect
@@ -51,22 +49,16 @@ def on_message(client, userdata, msg):
         return
 
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Copy MQTT events to DeltaLake.")
-    add_common_arguments(parser)
+def add_arguments(parser):
     parser.add_argument("-t", "--topic", dest="topics", action="append", help="The MQTT topic to subscribe to.")
 
-    args = parser.parse_args(argv)
 
+def normalize(args):
     if not args.topics and (env_topic := os.environ.get('MQTT_TOPIC')):
         args.topics = [env_topic]
 
-    return args
 
-
-def main(args):
-    args = parse_args(args)
-
+def run(args):
     register = DeviceRegister()
     register.add_device_type("plug", MonitoringPlug)
     register.add_device_type("presence", PresenceDetector)
@@ -108,15 +100,27 @@ def main(args):
     mqttc.user_data_set(register)
 
 
-    def sigterm_handler(SIGNAL, STACK_FRAME):
-        write(register, dlc)
-        sys.exit(0)
+    def handle_shutdown(signum, frame):
+        logger.info("received signal, shutting down", extra={"signum": signum})
+        mqttc.disconnect()
 
-    signal.signal(signal.SIGTERM, sigterm_handler)
-    signal.signal(signal.SIGINT, sigterm_handler)
+    signal.signal(signal.SIGTERM, handle_shutdown)
+    signal.signal(signal.SIGINT, handle_shutdown)
 
     mqttc.connect(args.host, 1883, 60)
 
     mqttc.loop_forever()
 
+    logger.info("Flushing remaining messages before exit")
+    write(register, dlc)
+
     return 0
+
+
+COMMAND = Command(
+    name="hierarchy",
+    help="Copy MQTT events to DeltaLake.",
+    add_arguments=add_arguments,
+    run=run,
+    normalize=normalize,
+)

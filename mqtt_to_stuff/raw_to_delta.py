@@ -1,4 +1,3 @@
-import argparse
 import datetime
 import logging
 import signal
@@ -8,7 +7,7 @@ import time
 import paho.mqtt.client as mqtt
 import polars as pl
 
-from .cli_args import add_common_arguments
+from .commands import Command
 from .delta_client import DeltaLakeClient
 from .mqtt_helpers import generate_on_connect
 from .storage_options import build_storage_options
@@ -57,17 +56,11 @@ def flush_buffer(dlc, interval):
         do_flush(dlc)
 
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Archive all MQTT messages to Delta Lake.")
-    add_common_arguments(parser)
+def add_arguments(parser):
     parser.add_argument("--ignore", dest="ignored_topics", action="append", default=[], metavar="TOPIC", help="Topic filter to ignore (repeatable, supports MQTT wildcards)")
 
-    return parser.parse_args(argv)
 
-
-def main(args):
-    args = parse_args(args)
-
+def run(args):
     options = build_storage_options(include_session_token=True)
 
     dlc = DeltaLakeClient(args.delta_path, options)
@@ -94,3 +87,11 @@ def main(args):
     do_flush(dlc)
 
     return 0
+
+
+COMMAND = Command(
+    name="raw",
+    help="Archive all MQTT messages to Delta Lake.",
+    add_arguments=add_arguments,
+    run=run,
+)

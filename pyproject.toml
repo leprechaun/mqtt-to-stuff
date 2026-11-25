@@ -27,7 +27,7 @@ exclude = ["*.nb.py"]
 [dependency-groups]
 dev = [
     "ruff>=0.17.0,<0.18.0",
-    "marimo>=0.25.0,<0.26.0",
+    "marimo>=0.26.0,<0.27.0",
     "altair>=6.0.0,<7.0.0",
     "pytest>=9.2.0,<9.3.0",
 ]
